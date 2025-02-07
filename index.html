@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookSwap</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/swiper@7/swiper-bundle.min.css" />
+
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+    
+    <link rel="stylesheet" href="css/style.css">
+
+</head>
+<body>
+    
+
+<header class="header">
+
+    <div class="header-1">
+
+        <a href="#" class="logo"> <i class="fas fa-book"></i> BookSwap </a>
+
+        <form action="" class="search-form">
+            <input type="search" name="" placeholder="meklēt šeit..." id="search-box">
+            <label for="search-box" class="fas fa-search"></label>
+        </form>
+
+        <div class="icons">
+            <div id="search-btn" class="fas fa-search"></div>
+            <a href="#" class="fas fa-heart"></a>
+            <a href="#" class="fas fa-shopping-cart"></a>
+            <div id="login-btn" class="fas fa-user"></div>
+        </div>
+
+    </div>
+
+    <div class="header-2">
+        <nav class="navbar">
+            <a href="#home">sākumlapa</a>
+            <a href="#featured">ieteicami</a>
+            <a href="#arrivals">jaunumi</a>
+            <a href="#reviews">atsauksmes</a>
+            <a href="#blogs">blogs</a>
+        </nav>
+    </div>
+
+</header>
+
+
+
+<nav class="bottom-navbar">
+    <a href="#home" class="fas fa-home"></a>
+    <a href="#featured" class="fas fa-list"></a>
+    <a href="#arrivals" class="fas fa-tags"></a>
+    <a href="#reviews" class="fas fa-comments"></a>
+    <a href="#blogs" class="fas fa-blog"></a>
+</nav>
+
+
+<div class="login-form-container">
+
+    <div id="close-login-btn" class="fas fa-times"></div>
+
+    <form action="">
+        <h3>ienākt</h3>
+        <span>lietotājvārds</span>
+        <input type="email" name="" class="box" placeholder="ievadiet savu e-pastu vai lietotājvārdu" id="">
+        <span>parole</span>
+        <input type="password" name="" class="box" placeholder="ievadiet savu paroli" id="">
+        <div class="checkbox">
+
+            <input type="checkbox" name="" id="remember-me">
+            <label for="remember-me"> atceries mani</label>
+        </div>
+        <input type="submit" value="sign in" class="btn">
+        <p>aizmirst paroli ? <a href="#">klikšķiniet šeit</a></p>
+        <p>nav konta ? <a href="#">izveidot vienu</a></p>
+    </form>
+
+</div>
+
+<!-- home section starts  -->
+
+<section class="home" id="home">
+
+    <div class="row">
+
+        <div class="content">
+            <h3>BookSwap - Grāmatu apmaiņas platforma</h3>
+            <p>Jaunāki grāmatas, kas jums patīk, bet jums nepieciešama jauna versija, vai jums ir grāmatas, kuras jūs vēlaties apmainīt ar citu lietotāju, BookSwap ir vieta, kur jūs varat to izdarīt.</p>
+            <a href="#" class="btn">Iepazīstieties tagad</a>
+        </div>
+
+        <div class="swiper books-slider">
+            <div class="swiper-wrapper">
+                <a href="#" class="swiper-slide"><img src="image/book-1.png" alt=""></a>
+                <a href="#" class="swiper-slide"><img src="image/book-2.png" alt=""></a>
+                <a href="#" class="swiper-slide"><img src="image/book-3.png" alt=""></a>
+                <a href="#" class="swiper-slide"><img src="image/book-4.png" alt=""></a>
+                <a href="#" class="swiper-slide"><img src="image/book-5.png" alt=""></a>
+                <a href="#" class="swiper-slide"><img src="image/book-6.png" alt=""></a>
+            </div>
+            <img src="image/stand.png" class="stand" alt="">
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<section class="icons-container">
+
+    <div class="icons">
+        <i class="fas fa-shipping-fast"></i>
+        <div class="content">
+            <h3>atrs piegāde</h3>
+            <p>piegāde 2-3 dienu laikā</p>
+        </div>
+    </div>
+
+    <div class="icons">
+        <i class="fas fa-lock"></i>
+        <div class="content">
+            <h3>droša apmaiņa</h3>
+            <p>100% droša apmaiņa</p>
+        </div>
+    </div>
+
+    <div class="icons">
+        <i class="fas fa-redo-alt"></i>
+        <div class="content">
+            <h3>vienkārša apmaiņa</h3>
+            <p>apmaiņa 3 soļos</p>
+        </div>
+    </div>
+
+    <div class="icons">
+        <i class="fas fa-headset"></i>
+        <div class="content">
+            <h3>24/7 atbalsts</h3>
+            <p>zvaniet jebkurā laikā</p>
+        </div>
+    </div>
+
+</section>
+
+
+<section class="featured" id="featured">
+
+    <h1 class="heading"> <span>populārākās grāmatas</span> </h1>
+
+    <div class="swiper featured-slider">
+
+        <div class="swiper-wrapper">
+
+            <div class="swiper-slide box">
+                <div class="icons">
+                    <a href="#" class="fas fa-search"></a>
+                    <a href="#" class="fas fa-heart"></a>
+                    <a href="#" class="fas fa-eye"></a>
+                </div>
+                <div class="image">
+                    <img src="image/book-1.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>populārās grāmatas</h3>
+                    <a href="#" class="btn">sākt apmaiņu</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="icons">
+                    <a href="#" class="fas fa-search"></a>
+                    <a href="#" class="fas fa-heart"></a>
+                    <a href="#" class="fas fa-eye"></a>
+                </div>
+                <div class="image">
+                    <img src="image/book-2.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>populārās grāmatas</h3>
+                    <a href="#" class="btn">sākt apmaiņu</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="icons">
+                    <a href="#" class="fas fa-search"></a>
+                    <a href="#" class="fas fa-heart"></a>
+                    <a href="#" class="fas fa-eye"></a>
+                </div>
+                <div class="image">
+                    <img src="image/book-3.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>populārās grāmatas</h3>
+                    <a href="#" class="btn">sākt apmaiņu</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="icons">
+                    <a href="#" class="fas fa-search"></a>
+                    <a href="#" class="fas fa-heart"></a>
+                    <a href="#" class="fas fa-eye"></a>
+                </div>
+                <div class="image">
+                    <img src="image/book-4.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>populārās grāmatas</h3>
+                    <a href="#" class="btn">sākt apmaiņu</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="icons">
+                    <a href="#" class="fas fa-search"></a>
+                    <a href="#" class="fas fa-heart"></a>
+                    <a href="#" class="fas fa-eye"></a>
+                </div>
+                <div class="image">
+                    <img src="image/book-5.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>populārās grāmatas</h3>
+                    <a href="#" class="btn">pievienot grozam</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="icons">
+                    <a href="#" class="fas fa-search"></a>
+                    <a href="#" class="fas fa-heart"></a>
+                    <a href="#" class="fas fa-eye"></a>
+                </div>
+                <div class="image">
+                    <img src="image/book-6.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>populārās grāmatas</h3>
+                    <a href="#" class="btn">pievienot grozam</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="icons">
+                    <a href="#" class="fas fa-search"></a>
+                    <a href="#" class="fas fa-heart"></a>
+                    <a href="#" class="fas fa-eye"></a>
+                </div>
+                <div class="image">
+                    <img src="image/book-7.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>populārās grāmatas</h3>
+                    <a href="#" class="btn">pievienot grozam</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="icons">
+                    <a href="#" class="fas fa-search"></a>
+                    <a href="#" class="fas fa-heart"></a>
+                    <a href="#" class="fas fa-eye"></a>
+                </div>
+                <div class="image">
+                    <img src="image/book-8.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>populārās grāmatas</h3>
+                    <a href="#" class="btn">pievienot grozam</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="icons">
+                    <a href="#" class="fas fa-search"></a>
+                    <a href="#" class="fas fa-heart"></a>
+                    <a href="#" class="fas fa-eye"></a>
+                </div>
+                <div class="image">
+                    <img src="image/book-9.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>populārās grāmatas</h3>
+                    <a href="#" class="btn">pievienot grozam</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="icons">
+                    <a href="#" class="fas fa-search"></a>
+                    <a href="#" class="fas fa-heart"></a>
+                    <a href="#" class="fas fa-eye"></a>
+                </div>
+                <div class="image">
+                    <img src="image/book-10.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>populārās grāmatas</h3>
+                    <a href="#" class="btn">pievienot grozam</a>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="swiper-button-next"></div>
+        <div class="swiper-button-prev"></div>
+
+    </div>
+
+</section>
+
+
+
+<section class="newsletter">
+
+    <form action="">
+        <h3>pierakstieties jaunumiem</h3>
+        <input type="email" name="" placeholder="ievadiet savu e-pastu" id="" class="box">
+        <input type="submit" value="pierakstīties" class="btn">
+    </form>
+
+</section>
+
+
+
+<section class="arrivals" id="arrivals">
+
+    <h1 class="heading"> <span>jaunās grāmatas</span> </h1>
+
+    <div class="swiper arrivals-slider">
+
+        <div class="swiper-wrapper">
+
+            <a href="#" class="swiper-slide box">
+                <div class="image">
+                    <img src="image/book-1.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>jaunās grāmatas</h3>
+                    <div class="stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star-half-alt"></i>
+                    </div>
+                </div>
+            </a>
+
+            <a href="#" class="swiper-slide box">
+                <div class="image">
+                    <img src="image/book-2.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>jaunās grāmatas</h3>
+                    <div class="stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star-half-alt"></i>
+                    </div>
+                </div>
+            </a>
+
+            <a href="#" class="swiper-slide box">
+                <div class="image">
+                    <img src="image/book-3.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>jaunās grāmatas</h3>
+                    <div class="stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star-half-alt"></i>
+                    </div>
+                </div>
+            </a>
+
+            <a href="#" class="swiper-slide box">
+                <div class="image">
+                    <img src="image/book-4.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>jaunās grāmatas</h3>
+                    <div class="stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star-half-alt"></i>
+                    </div>
+                </div>
+            </a>
+
+            <a href="#" class="swiper-slide box">
+                <div class="image">
+                    <img src="image/book-5.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>jaunās grāmatas</h3>
+                    <div class="stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star-half-alt"></i>
+                    </div>
+                </div>
+            </a>
+
+        </div>
+
+    </div>
+
+    <div class="swiper arrivals-slider">
+
+        <div class="swiper-wrapper">
+
+            <a href="#" class="swiper-slide box">
+                <div class="image">
+                    <img src="image/book-6.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>jaunās grāmatas</h3>
+                    <div class="stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star-half-alt"></i>
+                    </div>
+                </div>
+            </a>
+
+            <a href="#" class="swiper-slide box">
+                <div class="image">
+                    <img src="image/book-7.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>jaunās grāmatas</h3>
+                    <div class="stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star-half-alt"></i>
+                    </div>
+                </div>
+            </a>
+
+            <a href="#" class="swiper-slide box">
+                <div class="image">
+                    <img src="image/book-8.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>jaunās grāmatas</h3>
+                    <div class="stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star-half-alt"></i>
+                    </div>
+                </div>
+            </a>
+
+            <a href="#" class="swiper-slide box">
+                <div class="image">
+                    <img src="image/book-9.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>jaunās grāmatas</h3>
+                    <div class="stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star-half-alt"></i>
+                    </div>
+                </div>
+            </a>
+
+            <a href="#" class="swiper-slide box">
+                <div class="image">
+                    <img src="image/book-10.png" alt="">
+                </div>
+                <div class="content">
+                    <h3>jaunās grāmatas</h3>
+                    <div class="stars">
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star"></i>
+                        <i class="fas fa-star-half-alt"></i>
+                    </div>
+                </div>
+            </a>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<section class="reviews" id="reviews">
+
+    <h1 class="heading"> <span>klientu atsauksmes</span> </h1>
+
+    <div class="swiper reviews-slider">
+
+        <div class="swiper-wrapper">
+
+            <div class="swiper-slide box">
+                <img src="image/pic-1.png" alt="">
+                <h3>john</h3>
+                <p>Vietne ir ļoti laba un ērti lietojama, visas pieejamās grāmatas ir oriģinālas un ļoti lētas, tās var ērti iegādāties. Arī apmaiņas var veikt vienkārši.</p>
+                <div class="stars">
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star-half-alt"></i>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <img src="image/pic-2.png" alt="">
+                <h3>Juliyana</h3>
+                <p>Vietne ir ļoti laba un ērti lietojama, visas pieejamās grāmatas ir oriģinālas un ļoti lētas, tās var ērti iegādāties. Arī apmaiņas var veikt vienkārši.</p>
+                <div class="stars">
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star-half-alt"></i>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <img src="image/pic-3.png" alt="">
+                <h3>Joy</h3>
+                <p>Vietne ir ļoti laba un ērti lietojama, visas pieejamās grāmatas ir oriģinālas un ļoti lētas, tās var ērti iegādāties. Arī apmaiņas var veikt vienkārši.</p>
+                <div class="stars">
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star-half-alt"></i>
+                </div>
+            </div>
+            <div class="swiper-slide box">
+                <img src="image/pic-4.png" alt="">
+                <h3>Oliveya</h3>
+                <p>Vietne ir ļoti laba un ērti lietojama, visas pieejamās grāmatas ir oriģinālas un ļoti lētas, tās var ērti iegādāties. Arī apmaiņas var veikt vienkārši.</p>
+                <div class="stars">
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star-half-alt"></i>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <img src="image/pic-5.png" alt="">
+                <h3>William</h3>
+                <p>Vietne ir ļoti laba un ērti lietojama, visas pieejamās grāmatas ir oriģinālas un ļoti lētas, tās var ērti iegādāties. Arī apmaiņas var veikt vienkārši.</p>
+                <div class="stars">
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star-half-alt"></i>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <img src="image/pic-6.png" alt="">
+                <h3>Ava</h3>
+                <p>Vietne ir ļoti laba un ērti lietojama, visas pieejamās grāmatas ir oriģinālas un ļoti lētas, tās var ērti iegādāties. Arī apmaiņas var veikt vienkārši.</p>
+                <div class="stars">
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star-half-alt"></i>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+    
+</section>
+
+
+
+<section class="blogs" id="blogs">
+
+    <h1 class="heading"> <span>mūsu blogi</span> </h1>
+
+    <div class="swiper blogs-slider">
+
+        <div class="swiper-wrapper">
+
+            <div class="swiper-slide box">
+                <div class="image">
+                    <img src="image/blog-1.jpg" alt="">
+                </div>
+                <div class="content">
+                    <h3>bloga virsraksts</h3>
+                    <p>Grāmatas ir ļoti noderīgas mūsu dzīvē. Mums vajadzētu lasīt grāmatas katru dienu, tas attīsta prātu. Visi pasaules veiksmīgie cilvēki lasa grāmatas katru dienu.</p>
+                    <a href="#" class="btn">lasīt vairāk</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="image">
+                    <img src="image/blog-2.jpg" alt="">
+                </div>
+                <div class="content">
+                    <h3>bloga virsraksts</h3>
+                    <p>Grāmatas ir ļoti noderīgas mūsu dzīvē. Mums vajadzētu lasīt grāmatas katru dienu, tas attīsta prātu. Visi pasaules veiksmīgie cilvēki lasa grāmatas katru dienu.</p>
+                    <a href="#" class="btn">lasīt vairāk</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="image">
+                    <img src="image/blog-3.jpg" alt="">
+                </div>
+                <div class="content">
+                    <h3>bloga virsraksts</h3>
+                    <p>Grāmatas ir ļoti noderīgas mūsu dzīvē. Mums vajadzētu lasīt grāmatas katru dienu, tas attīsta prātu. Visi pasaules veiksmīgie cilvēki lasa grāmatas katru dienu.</p>
+                    <a href="#" class="btn">lasīt vairāk</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="image">
+                    <img src="image/blog-4.jpg" alt="">
+                </div>
+                <div class="content">
+                    <h3>bloga virsraksts</h3>
+                    <p>Grāmatas ir ļoti noderīgas mūsu dzīvē. Mums vajadzētu lasīt grāmatas katru dienu, tas attīsta prātu. Visi pasaules veiksmīgie cilvēki lasa grāmatas katru dienu.</p>
+                    <a href="#" class="btn">lasīt vairāk</a>
+                </div>
+            </div>
+
+            <div class="swiper-slide box">
+                <div class="image">
+                    <img src="image/blog-5.jpg" alt="">
+                </div>
+                <div class="content">
+                    <h3>bloga virsraksts</h3>
+                    <p>Grāmatas ir ļoti noderīgas mūsu dzīvē. Mums vajadzētu lasīt grāmatas katru dienu, tas attīsta prātu. Visi pasaules veiksmīgie cilvēki lasa grāmatas katru dienu.</p>
+                    <a href="#" class="btn">lasīt vairāk</a>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<section class="footer">
+
+    <div class="box-container">
+
+        <div class="box">
+            <h3>mūsu atrašanās vietas</h3>
+            <a href="#"> <i class="fas fa-map-marker-alt"></i> Latvija </a>
+            <a href="#"> <i class="fas fa-map-marker-alt"></i> Igaunija </a>
+            <a href="#"> <i class="fas fa-map-marker-alt"></i> Lietuva </a>
+            <a href="#"> <i class="fas fa-map-marker-alt"></i> Polija </a>
+            <a href="#"> <i class="fas fa-map-marker-alt"></i> Krievija </a>
+        </div>
+
+
+        <div class="box">
+            <h3>ātrās saites</h3>
+            <a href="#"> <i class="fas fa-arrow-right"></i> sākumlapa </a>
+            <a href="#"> <i class="fas fa-arrow-right"></i> populārākās </a>
+            <a href="#"> <i class="fas fa-arrow-right"></i> jaunumi </a>
+            <a href="#"> <i class="fas fa-arrow-right"></i> atsauksmes </a>
+            <a href="#"> <i class="fas fa-arrow-right"></i> blogi </a>
+        </div>
+
+        <div class="box">
+            <h3>papildu saites</h3>
+            <a href="#"> <i class="fas fa-arrow-right"></i> konta informācija </a>
+            <a href="#"> <i class="fas fa-arrow-right"></i> pasūtītās preces </a>
+            <a href="#"> <i class="fas fa-arrow-right"></i> privātuma politika </a>
+            <a href="#"> <i class="fas fa-arrow-right"></i> apmaiņas metodes </a>
+            <a href="#"> <i class="fas fa-arrow-right"></i> mūsu pakalpojumi </a>
+        </div>
+
+        <div class="box">
+            <h3>kontaktinformācija</h3>
+            <a href="#"> <i class="fas fa-phone"></i> +371 23753771 </a>
+            <a href="#"> <i class="fas fa-phone"></i> +371 21753964 </a>
+            <a href="#"> <i class="fas fa-envelope"></i> bookswap@gmail.com </a>
+            
+        </div>
+        
+    </div>
+
+    <div class="share">
+        <a href="#" class="fab fa-facebook-f"></a>
+        <a href="#" class="fab fa-twitter"></a>
+        <a href="#" class="fab fa-instagram"></a>
+        <a href="#" class="fab fa-linkedin"></a>
+        <a href="#" class="fab fa-pinterest"></a>
+    </div>
+
+    <div class="credit"> izveidoja <span>BookSwap komanda</span> | visas tiesības aizsargātas! </div>
+
+</section>
+
+
+
+<div class="loader-container">
+    <img src="image/loader-img.gif" alt="">
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script src="https://unpkg.com/swiper@7/swiper-bundle.min.js"></script>
+
+<!-- custom js file link  -->
+<script src="js/script.js"></script>
+
+</body>
+</html>
