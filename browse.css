@@ -1,0 +1,209 @@
+/* Browse Page Styles */
+.browse-header {
+    background-color: var(--color-paper);
+    padding: var(--spacing-8) 0;
+  }
+  
+  .browse-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-4);
+  }
+  
+  .browse-description {
+    color: var(--color-gray);
+    margin-bottom: var(--spacing-6);
+  }
+  
+  .search-filter-desktop {
+    display: none;
+  }
+  
+  .search-container-browse {
+    position: relative;
+    margin-bottom: var(--spacing-4);
+  }
+  
+  .search-input-browse {
+    width: 100%;
+    padding: var(--spacing-3) var(--spacing-10) var(--spacing-3) var(--spacing-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-paper);
+    background-color: var(--color-white);
+  }
+  
+  .search-icon {
+    position: absolute;
+    right: var(--spacing-3);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-gray);
+    pointer-events: none;
+  }
+  
+  .filter-selects {
+    display: flex;
+    gap: var(--spacing-4);
+  }
+  
+  .select-wrapper {
+    position: relative;
+    flex-grow: 1;
+  }
+  
+  .select-wrapper::after {
+    content: '';
+    position: absolute;
+    right: var(--spacing-3);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid var(--color-gray);
+    pointer-events: none;
+  }
+  
+  .filter-select {
+    width: 100%;
+    padding: var(--spacing-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-paper);
+    background-color: var(--color-white);
+    appearance: none;
+    cursor: pointer;
+  }
+  
+  .filter-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-paper);
+    background-color: var(--color-white);
+    color: var(--color-darkwood);
+  }
+  
+  .browse-container {
+    padding: var(--spacing-8) 0;
+  }
+  
+  /* Filter Modal */
+  .filter-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 100;
+    align-items: flex-end;
+  }
+  
+  .filter-modal.active {
+    display: flex;
+  }
+  
+  .filter-modal-content {
+    background-color: var(--color-white);
+    width: 100%;
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
+    padding: var(--spacing-6);
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .filter-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-6);
+  }
+  
+  .filter-modal-header h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  
+  .close-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-gray);
+  }
+  
+  .filter-modal-body {
+    margin-bottom: var(--spacing-6);
+  }
+  
+  .filter-group {
+    margin-bottom: var(--spacing-4);
+  }
+  
+  .filter-group label {
+    display: block;
+    margin-bottom: var(--spacing-2);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  
+  .filter-modal-footer {
+    display: flex;
+    gap: var(--spacing-4);
+  }
+  
+  .filter-modal-footer .btn {
+    flex: 1;
+  }
+  
+  .no-books-found {
+    text-align: center;
+    padding: var(--spacing-12) 0;
+  }
+  
+  .no-books-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-2);
+  }
+  
+  .no-books-message {
+    color: var(--color-gray);
+    margin-bottom: var(--spacing-4);
+  }
+  
+  /* Media Queries */
+  @media (min-width: 768px) {
+    .search-filter-mobile {
+      display: none;
+    }
+    
+    .search-filter-desktop {
+      display: flex;
+      gap: var(--spacing-4);
+    }
+    
+    .search-container-browse {
+      flex-grow: 1;
+      margin-bottom: 0;
+    }
+    
+    .filter-modal {
+      display: none !important; /* Force hide on desktop */
+    }
+  }
+  
+  /* Animations */
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  

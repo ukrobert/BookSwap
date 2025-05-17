@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jūsu profils | BookSwap</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body>
+  <header class="navigation">
+    <div class="container">
+      <div class="nav-wrapper">
+        <!-- Logo & Brand -->
+        <a href="index.html" class="brand">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+          <h1 class="brand-name">BookSwap</h1>
+        </a>
+        
+        <!-- Desktop Navigation -->
+        <nav class="desktop-nav">
+          <a href="browse.html" class="nav-link">Pārlūkot grāmatas</a>
+          <a href="how-it-works.html" class="nav-link">Kā tas darbojas</a>
+          <a href="#" class="btn btn-primary mobile-btn" id="logoutBtn">Izlogoties</a>
+        </nav>
+        
+      
+        
+        <!-- Mobile Menu Button -->
+        <button class="mobile-menu-button">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+      </div>
+      
+      <!-- Mobile Menu (Hidden by default) -->
+      <div class="mobile-menu" id="mobileMenu">
+        <a href="browse.html" class="nav-link">Pārlūkot grāmatas</a>
+          <a href="how-it-works.html" class="nav-link">Kā tas darbojas</a>
+        <div class="mobile-actions">
+          <a href="#" class="btn btn-primary mobile-btn" id="logoutBtn">Izlogoties</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="profile-section">
+      <div class="container">
+        <div class="profile-header">
+          <h1>Your Profile</h1>
+          <button id="saveProfileBtn" class="btn-primary">Saglabāt izmaiņas</button>
+        </div>
+        
+        <div class="profile-content">
+          <div class="profile-sidebar">
+            <div class="profile-photo-container">
+              <div class="profile-photo" id="profilePhotoPreview">
+                <!-- Profile photo will be displayed here -->
+                <div class="profile-photo-placeholder">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </div>
+              </div>
+              <div class="profile-photo-actions">
+                <label for="profilePhotoInput" class="btn-outline btn-small">Mainīt foto</label>
+                <input type="file" id="profilePhotoInput" accept="image/*" class="hidden">
+                <button id="removePhotoBtn" class="btn-text btn-small">Noņemt</button>
+              </div>
+            </div>
+            
+            <div class="profile-stats">
+              <div class="stat-item">
+                <span class="stat-number">12</span>
+                <span class="stat-label">Izliktas grāmatas</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number">8</span>
+                <span class="stat-label">Maiņas</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number">4.8</span>
+                <span class="stat-label">Vērtējums</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="profile-details">
+            <form id="profileForm">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="firstName">Vārds</label>
+                  <input type="text" id="firstName" class="form-input" placeholder="Jūsu vārds" required>
+                </div>
+                <div class="form-group">
+                  <label for="lastName">Uzvārds</label>
+                  <input type="text" id="lastName" class="form-input" placeholder="Jūsu uzvārds" required>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="email">E-pasts</label>
+                <input type="email" id="email" class="form-input" placeholder="Jūsu e-pasta adrese" disabled>
+              </div>
+              <div class="form-group">
+                <label for="location">Atrašanās vieta</label>
+                <input type="text" id="location" class="form-input" placeholder="Pilsēta, Valsts">
+              </div>
+              <div class="form-group">
+                <label for="bio">Biogrāfija</label>
+                <textarea id="bio" class="form-textarea" rows="4" placeholder="Pastāstiet mums par sevi un savām grāmatu interesēm..."></textarea>
+              </div>
+              <div class="form-section-title">
+                <h3>Kontu drošība</h3>
+              </div>
+              <div class="form-group">
+                <button type="button" id="changePasswordBtn" class="btn-outline">Mainīt paroli</button>
+              </div>
+              <div id="passwordChangeSection" class="password-change-section hidden">
+                <div class="form-group">
+                  <label for="currentPassword">Pašreizējā parole</label>
+                  <input type="password" id="currentPassword" class="form-input" placeholder="Ievadiet savu pašreizējo paroli">
+                </div>
+                <div class="form-group">
+                  <label for="newPassword">Jaunā parole</label>
+                  <input type="password" id="newPassword" class="form-input" placeholder="Ievadiet savu jauno paroli">
+                </div>
+                <div class="form-group">
+                  <label for="confirmNewPassword">Apstipriniet jauno paroli</label>
+                  <input type="password" id="confirmNewPassword" class="form-input" placeholder="Apstipriniet savu jauno paroli">
+                </div>
+                <div class="form-actions">
+                  <button type="button" id="savePasswordBtn" class="btn-primary">Atjaunot paroli</button>
+                  <button type="button" id="cancelPasswordBtn" class="btn-outline">Atcelt</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  
+  <div id="successToast" class="toast">
+    <div class="toast-content">
+      <div class="toast-icon success">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+      </div>
+      <p class="toast-message" id="toastMessage">Jūsu profils ir veiksmīgi atjaunināts!</p>
+    </div>
+    <button class="toast-close" id="closeToast">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+  </div>
+  
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <!-- Brand Section -->
+        <div class="footer-brand">
+          <a href="index.html" class="brand">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+            <h2 class="brand-name">BookSwap</h2>
+          </a>
+          <p>Saistieties ar citiem lasītājiem un apmainieties ar grāmatām, kuras jūs mīlat.</p>
+          <div class="social-links">
+            <a href="#" class="social-link">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+            </a>
+            <a href="#" class="social-link">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"></path></svg>
+            </a>
+            <a href="#" class="social-link">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+            </a>
+          </div>
+        </div>
+        
+        <!-- Quick Links -->
+        <div class="footer-links">
+          <h3 class="footer-title">Ātrās saites</h3>
+          <ul>
+            <li><a href="browse.html">Pārlūkot grāmatas</a></li>
+            <li><a href="how-it-works.html">Kā tas strādā</a></li>
+            <li><a href="signup.html">Pievienoties BookSwap</a></li>
+            <li><a href="login.html">Pieslēgties</a></li>
+          </ul>
+        </div>
+        
+        <!-- Help & Support -->
+        <div class="footer-links">
+          <h3 class="footer-title">Palīdzība un atbalsts</h3>
+          <ul>
+            <li><a href="faq.html">BUJ</a></li>
+            <li><a href="contact-us.html">Sazināties ar mums</a></li>
+            <li><a href="safety-tips.html">Drošības padomi</a></li>
+            <li><a href="report-issue.html">Ziņot par problēmu</a></li>
+          </ul>
+        </div>
+        
+        <!-- Legal -->
+        <div class="footer-links">
+          <h3 class="footer-title">Juridiskā informācija</h3>
+          <ul>
+            <li><a href="terms.html">Pakalpojumu noteikumi</a></li>
+            <li><a href="privacy-policy.html">Privātuma politika</a></li>
+            <li><a href="cookies.html">Sīkfailu politika</a></li>
+            <li><a href="gdpr.html">VDAR</a></li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="footer-bottom">
+        <p>&copy; <span id="currentYear"></span> BookSwap. Visas tiesības aizsargātas.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+  <script src="profile.js"></script>
+</body>
+</html>
