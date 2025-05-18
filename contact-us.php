@@ -1,3 +1,121 @@
+<?php
+// contact-us.php
+
+/**
+ * Kontaktu formas apstrādes skripts BookSwap platformai
+ * 
+ * Šis fails apstrādā lietotāju iesūtītos kontaktu formas ziņojumus,
+ * veic datu validāciju un saglabā ziņojumus datubāzē.
+ * 
+ * @author Roberto Šķiņķis
+ * @version 1.0
+ */
+
+// Sesijas inicializācija
+session_start();
+
+// Datubāzes savienojuma konfigurācija
+$db_host = "localhost";     // Datubāzes servera adrese
+$db_user = "bookswap_user"; // Datubāzes lietotājvārds
+$db_pass = "secure_password"; // Datubāzes parole
+$db_name = "bookswap_db";   // Datubāzes nosaukums
+
+// Kļūdu ziņojumu mainīgais
+$error_message = "";
+$success_message = "";
+
+// Pārbaudām, vai forma ir iesniegta
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    
+    // Iegūstam un attīrām ievades datus
+    $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_SPECIAL_CHARS);
+    $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+    $subject = filter_input(INPUT_POST, 'subject', FILTER_SANITIZE_SPECIAL_CHARS);
+    $message = filter_input(INPUT_POST, 'message', FILTER_SANITIZE_SPECIAL_CHARS);
+    
+    // Validācija
+    $is_valid = true;
+    $errors = array();
+    
+    // Pārbaudām, vai obligātie lauki ir aizpildīti
+    if (empty($name)) {
+        $is_valid = false;
+        $errors['name'] = "Lūdzu, ievadiet savu vārdu";
+    }
+    
+    if (empty($email)) {
+        $is_valid = false;
+        $errors['email'] = "Lūdzu, ievadiet savu e-pasta adresi";
+    } else if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $is_valid = false;
+        $errors['email'] = "Lūdzu, ievadiet derīgu e-pasta adresi";
+    }
+    
+    if (empty($message)) {
+        $is_valid = false;
+        $errors['message'] = "Lūdzu, ievadiet ziņojuma tekstu";
+    }
+    
+    // Ja temats nav norādīts, izmantojam noklusējuma vērtību
+    if (empty($subject)) {
+        $subject = "Ziņojums no kontaktu formas";
+    }
+    
+    // Ja visi dati ir derīgi, saglabājam ziņojumu
+    if ($is_valid) {
+        try {
+            // Izveidojam savienojumu ar datubāzi
+            $conn = new PDO("mysql:host=$db_host;dbname=$db_name", $db_user, $db_pass);
+            $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            
+            // Sagatvojam un izpildām SQL vaicājumu
+            $stmt = $conn->prepare("INSERT INTO contact_messages (name, email, subject, message, ip_address, created_at) 
+                                   VALUES (:name, :email, :subject, :message, :ip, NOW())");
+            $stmt->bindParam(':name', $name);
+            $stmt->bindParam(':email', $email);
+            $stmt->bindParam(':subject', $subject);
+            $stmt->bindParam(':message', $message);
+            $stmt->bindParam(':ip', $_SERVER['REMOTE_ADDR']);
+            $stmt->execute();
+            
+            // Nosūtām paziņojumu administratoram
+            $admin_email = "admin@bookswap.example.com";
+            $admin_subject = "Jauns kontakta ziņojums: " . $subject;
+            $admin_message = "Saņemts jauns ziņojums no kontaktu formas:\n\n";
+            $admin_message .= "Vārds: " . $name . "\n";
+            $admin_message .= "E-pasts: " . $email . "\n";
+            $admin_message .= "Temats: " . $subject . "\n";
+            $admin_message .= "Ziņojums: " . $message . "\n";
+            $admin_message .= "IP adrese: " . $_SERVER['REMOTE_ADDR'] . "\n";
+            $admin_message .= "Datums: " . date('Y-m-d H:i:s');
+            
+            $headers = "From: " . $email;
+            
+            // Reālā vidē šeit būtu jāizmanto e-pasta sūtīšanas bibliotēka, piemēram, PHPMailer
+            // Šeit vienkāršības labad izmantojam mail() funkciju
+            // mail($admin_email, $admin_subject, $admin_message, $headers);
+            
+            // Iestatām veiksmīga ziņojuma tekstu
+            $success_message = "Paldies par ziņojumu! Mēs sazināsimies ar jums, cik drīz vien iespējams.";
+            
+            // Notīrām formas laukus
+            $name = $email = $subject = $message = "";
+            
+        } catch(PDOException $e) {
+            // Datubāzes kļūda
+            $error_message = "Kļūda, nosūtot ziņojumu: " . $e->getMessage();
+            error_log("Datubāzes kļūda kontaktu formā: " . $e->getMessage());
+        }
+        
+        // Aizveram datubāzes savienojumu
+        $conn = null;
+    } else {
+        // Ja ir validācijas kļūdas, saglabājam tās JSON formātā
+        $error_message = json_encode($errors);
+    }
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -164,8 +282,8 @@
         
         <!-- Desktop Actions -->
         <div class="desktop-actions">
-          <a href="login.html" class="btn btn-outline">Pieslēgties</a>
-          <a href="signup.html" class="btn btn-primary">Reģistrēties</a>
+          <a href="login.php" class="btn btn-outline">Pieslēgties</a>
+          <a href="signup.php" class="btn btn-primary">Reģistrēties</a>
         </div>
         
         <!-- Mobile Menu Button -->
@@ -179,8 +297,8 @@
         <a href="browse.html" class="mobile-nav-link">Pārlūkot grāmatas</a>
         <a href="how-it-works.html" class="mobile-nav-link">Kā tas darbojas</a>
         <div class="mobile-actions">
-          <a href="login.html" class="btn btn-outline mobile-btn">Pieslēgties</a>
-          <a href="signup.html" class="btn btn-primary mobile-btn">Reģistrēties</a>
+          <a href="login.php" class="btn btn-outline mobile-btn">Pieslēgties</a>
+          <a href="signup.php" class="btn btn-primary mobile-btn">Reģistrēties</a>
         </div>
       </div>
     </div>
@@ -237,32 +355,46 @@
       <div class="contact-form-section">
         <h2 class="text-xl font-serif font-semibold mb-4">Sūti mums ziņu</h2>
         
-        <div id="formSuccess" class="form-success">
-          Paldies par ziņojumu! Mēs sazināsimies ar jums, cik drīz vien iespējams.
-        </div>
+        <?php if (!empty($success_message)): ?>
+            <div id="formSuccess" class="form-success active">
+                <?php echo $success_message; ?>
+            </div>
+        <?php endif; ?>
         
-        <form id="contactForm">
+        <form id="contactForm" method="post" action="contact-us.php">
           <div class="form-group required">
             <label for="name" class="form-label">Vārds</label>
-            <input type="text" id="name" name="name" class="form-input" required>
-            <div id="nameError" class="form-error">Lūdzu, ievadiet savu vārdu</div>
+            <input type="text" id="name" name="name" class="form-input" value="<?php echo isset($name) ? htmlspecialchars($name) : ''; ?>" required>
+            <?php if (isset($errors['name'])): ?>
+                <div id="nameError" class="form-error active"><?php echo $errors['name']; ?></div>
+            <?php else: ?>
+                <div id="nameError" class="form-error">Lūdzu, ievadiet savu vārdu</div>
+            <?php endif; ?>
           </div>
           
           <div class="form-group required">
             <label for="email" class="form-label">E-pasts Address</label>
-            <input type="email" id="email" name="email" class="form-input" required>
-            <div id="emailError" class="form-error">Lūdzu, ievadiet derīgu e-pasta adresi</div>
+            <input type="email" id="email" name="email" class="form-input" value="<?php echo isset($email) ? htmlspecialchars($email) : ''; ?>" required>
+            <?php if (isset($errors['email'])): ?>
+                <div id="emailError" class="form-error active"><?php echo $errors['email']; ?></div>
+            <?php else: ?>
+                <div id="emailError" class="form-error">Lūdzu, ievadiet derīgu e-pasta adresi</div>
+            <?php endif; ?>
           </div>
           
           <div class="form-group">
             <label for="subject" class="form-label">Temats</label>
-            <input type="text" id="subject" name="subject" class="form-input">
+            <input type="text" id="subject" name="subject" class="form-input" value="<?php echo isset($subject) ? htmlspecialchars($subject) : ''; ?>">
           </div>
           
           <div class="form-group required">
             <label for="message" class="form-label">Ziņa</label>
-            <textarea id="message" name="message" class="form-textarea" required></textarea>
-            <div id="messageError" class="form-error">Lūdzu, ievadiet savu ziņu</div>
+            <textarea id="message" name="message" class="form-textarea" required><?php echo isset($message) ? htmlspecialchars($message) : ''; ?></textarea>
+            <?php if (isset($errors['message'])): ?>
+                <div id="messageError" class="form-error active"><?php echo $errors['message']; ?></div>
+            <?php else: ?>
+                <div id="messageError" class="form-error">Lūdzu, ievadiet savu ziņu</div>
+            <?php endif; ?>
           </div>
           
           <div class="form-group">
@@ -302,8 +434,8 @@
           <ul>
             <li><a href="browse.html">Pārlūkot grāmatas</a></li>
             <li><a href="how-it-works.html">Kā tas darbojas</a></li>
-            <li><a href="signup.html">Pievienojies BookSwap</a></li>
-            <li><a href="login.html">Pieslēgties</a></li>
+            <li><a href="signup.php">Pievienojies BookSwap</a></li>
+            <li><a href="login.php">Pieslēgties</a></li>
           </ul>
         </div>
         
@@ -312,9 +444,9 @@
           <h3 class="footer-title">Palīdzība un atbalsts</h3>
           <ul>
             <li><a href="faq.html">BUJ</a></li>
-            <li><a href="contact-us.html">Sazinies ar mums</a></li>
+            <li><a href="contact-us.php">Sazinies ar mums</a></li>
             <li><a href="safety-tips.html">Drošības padomi</a></li>
-            <li><a href="report-issue.html">Ziņot par problēmu</a></li>
+            <li><a href="report-issue.php">Ziņot par problēmu</a></li>
           </ul>
         </div>
         
