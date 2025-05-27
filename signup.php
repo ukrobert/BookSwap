@@ -9,67 +9,95 @@ redirectIfLoggedIn();
 require_once 'connect_db.php';
 
 // Инициализируем переменные
-$email = $password = '';
+$firstName = $lastName = $email = $password = $confirmPassword = '';
 $errors = [];
-$rememberMe = false;
+$success = false;
 
 // Обработка отправки формы
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Получаем данные из формы
+    $firstName = trim($_POST['firstName'] ?? '');
+    $lastName = trim($_POST['lastName'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    $rememberMe = isset($_POST['rememberMe']);
+    $confirmPassword = $_POST['confirmPassword'] ?? '';
+    $agreeTerms = isset($_POST['agreeTerms']);
     
     // Валидация данных
+    if (empty($firstName)) {
+        $errors[] = 'Vārds ir obligāts lauks';
+    }
+    
+    if (empty($lastName)) {
+        $errors[] = 'Uzvārds ir obligāts lauks';
+    }
+    
     if (empty($email)) {
         $errors[] = 'E-pasts ir obligāts lauks';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'Lūdzu, ievadiet derīgu e-pasta adresi';
     }
     
     if (empty($password)) {
         $errors[] = 'Parole ir obligāts lauks';
+    } elseif (strlen($password) < 8) {
+        $errors[] = 'Parolei jābūt vismaz 8 rakstzīmēm';
     }
     
-    // Если нет ошибок, проверяем учетные данные
+    if ($password !== $confirmPassword) {
+        $errors[] = 'Paroles nesakrīt';
+    }
+    
+    if (!$agreeTerms) {
+        $errors[] = 'Jums jāpiekrīt lietošanas noteikumiem un privātuma politikai';
+    }
+    
+    // Проверяем, не существует ли пользователь с таким email
     if (empty($errors)) {
-        // Ищем пользователя по email
-        $stmt = $savienojums->prepare("SELECT LietotajsID, Lietotajvards, E_pasts, Parole FROM bookswap_users WHERE E_pasts = ?");
+        $stmt = $savienojums->prepare("SELECT LietotajsID FROM bookswap_users WHERE E_pasts = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();
         
-        if ($result->num_rows === 1) {
-            $user = $result->fetch_assoc();
+        if ($result->num_rows > 0) {
+            $errors[] = 'Lietotājs ar šādu e-pasta adresi jau eksistē';
+        }
+        $stmt->close();
+    }
+    
+    // Если нет ошибок, регистрируем пользователя
+    if (empty($errors)) {
+        // Хешируем пароль
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+        
+        // Полное имя пользователя
+        $fullName = $firstName . ' ' . $lastName;
+        
+        // Текущая дата и время
+        $registrationDate = date('Y-m-d H:i:s');
+        
+        // Роль по умолчанию
+        $role = 'Registrēts';
+        
+        // Вставляем данные в БД
+        $stmt = $savienojums->prepare("INSERT INTO bookswap_users (Lietotajvards, E_pasts, Parole, RegistracijasDatums, Loma) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssss", $fullName, $email, $hashedPassword, $registrationDate, $role);
+        
+        if ($stmt->execute()) {
+            // Получаем ID нового пользователя
+            $userId = $savienojums->insert_id;
             
-            // Проверяем пароль
-            if (password_verify($password, $user['Parole'])) {
-                // Создаем сессию
-                $_SESSION['user_id'] = $user['LietotajsID'];
-                $_SESSION['user_name'] = $user['Lietotajvards'];
-                $_SESSION['user_email'] = $user['E_pasts'];
-                $_SESSION['is_logged_in'] = true;
-                
-                // Если выбрано "запомнить меня", устанавливаем cookie
-                if ($rememberMe) {
-                    $token = bin2hex(random_bytes(32)); // Генерируем случайный токен
-                    
-                    // Хешируем токен для хранения в БД
-                    $hashedToken = password_hash($token, PASSWORD_DEFAULT);
-                    
-                    // Сохраняем токен в БД (предполагается, что есть таблица для токенов)
-                    // В данном случае, для простоты, мы просто установим cookie
-                    
-                    // Устанавливаем cookie на 30 дней
-                    setcookie('bookswap_remember', $user['LietotajsID'] . ':' . $token, time() + 60*60*24*30, '/', '', false, true);
-                }
-                
-                // Перенаправляем на страницу профиля
-                header('Location: profile.php');
-                exit();
-            } else {
-                $errors[] = 'Nepareizs e-pasts vai parole';
-            }
+            // Создаем сессию
+            $_SESSION['user_id'] = $userId;
+            $_SESSION['user_name'] = $fullName;
+            $_SESSION['user_email'] = $email;
+            $_SESSION['is_logged_in'] = true;
+            
+            // Перенаправляем на страницу профиля
+            header('Location: profile.php');
+            exit();
         } else {
-            $errors[] = 'Nepareizs e-pasts vai parole';
+            $errors[] = 'Reģistrācijas laikā radās kļūda: ' . $savienojums->error;
         }
         $stmt->close();
     }
@@ -81,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login | BookSwap</title>
+  <title>Reģistrācija | BookSwap</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="auth.css">
 </head>
@@ -116,9 +144,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="mobile-menu" id="mobileMenu">
         <a href="browse.php" class="nav-link">Pārlūkot grāmatas</a>
         <a href="how-it-works.php" class="nav-link">Kā tas darbojas</a>
-        
         <div class="mobile-actions">
-          
+          <a href="browse.php" class="nav-link">Pārlūkot grāmatas</a>
+        <a href="how-it-works.php" class="nav-link">Kā tas darbojas</a>
         </div>
       </div>
     </div>
@@ -128,10 +156,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <section class="auth-section">
       <div class="container">
         <div class="auth-container">
-          <h1 class="auth-title">Pieslēgties BookSwap</h1>
-          <p class="auth-subtitle">Laipni lūdzam atpakaļ! Lūdzu, ievadiet savus datus, lai piekļūtu savam kontam.</p>
+          <h1 class="auth-title">Izveido savu kontu</h1>
+          <p class="auth-subtitle">Pievienojies mūsu grāmatu mīļotāju kopienai un sāc dalīties ar savu kolekciju jau šodien.</p>
           
-          <form id="loginForm" class="auth-form" method="POST" action="login.php">
+          <form id="signupForm" class="auth-form" method="POST" action="signup.php">
             <?php if (!empty($errors)): ?>
               <div class="auth-error active">
                 <?php foreach ($errors as $error): ?>
@@ -140,47 +168,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               </div>
             <?php endif; ?>
             
+            <div class="form-row">
+              <div class="form-group">
+                <label for="firstName">Vārds</label>
+                <input type="text" id="firstName" name="firstName" class="form-input" placeholder="Ievadi savu vārdu" required value="<?php echo htmlspecialchars($firstName); ?>">
+              </div>
+              
+              <div class="form-group">
+                <label for="lastName">Uzvārds</label>
+                <input type="text" id="lastName" name="lastName" class="form-input" placeholder="Ievadi savu uzvārdu" required value="<?php echo htmlspecialchars($lastName); ?>">
+              </div>
+            </div>
+            
             <div class="form-group">
               <label for="email">E-pasts</label>
-              <input type="email" id="email" name="email" class="form-input" placeholder="Ievadiet savu e-pasta adresi" required value="<?php echo htmlspecialchars($email); ?>">
+              <input type="email" id="email" name="email" class="form-input" placeholder="Ievadi savu e-pastu" required value="<?php echo htmlspecialchars($email); ?>">
             </div>
             
             <div class="form-group">
               <label for="password">Parole</label>
               <div class="password-input">
-                <input type="password" id="password" name="password" class="form-input" placeholder="Ievadiet savu paroli" required>
+                <input type="password" id="password" name="password" class="form-input" placeholder="Izveido paroli" required>
+                <button type="button" class="toggle-password">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
+              </div>
+              <div class="password-strength-meter">
+                <div class="strength-bar"></div>
+              </div>
+              <p class="password-requirements">Parolei jābūt vismaz 8 rakstzīmēm ar burtu, ciparu un simbolu kombināciju</p>
+            </div>
+            
+            <div class="form-group">
+              <label for="confirmPassword">Apstiprini paroli</label>
+              <div class="password-input">
+                <input type="password" id="confirmPassword" name="confirmPassword" class="form-input" placeholder="Apstiprini savu paroli" required>
                 <button type="button" class="toggle-password">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                 </button>
               </div>
             </div>
             
-            <div class="form-options">
-              <div class="remember-me">
-                <input type="checkbox" id="rememberMe" name="rememberMe" <?php echo $rememberMe ? 'checked' : ''; ?>>
-                <label for="rememberMe">Atceries mani</label>
-              </div>
-              <a href="#" class="forgot-password">Aizmirsāt paroli?</a>
+            <div class="form-group terms">
+              <input type="checkbox" id="agreeTerms" name="agreeTerms" required <?php echo isset($_POST['agreeTerms']) ? 'checked' : ''; ?>>
+              <label for="agreeTerms">Es piekrītu <a href="terms.php" class="auth-link">Lietošanas noteikumiem</a> un <a href="privacy-policy.php" class="auth-link">Privātuma politikai</a></label>
             </div>
             
-            <button type="submit" class="btn-primary btn-full">Piesakieties</button>
+            <button type="submit" class="btn-primary btn-full">Izveidot kontu</button>
             
             <div class="auth-divider">
-              <span>or</span>
+              <span>vai</span>
             </div>
             
             <button type="button" class="btn-outline btn-full social-login">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle><line x1="21.17" y1="8" x2="12" y2="8"></line><line x1="3.95" y1="6.06" x2="8.54" y2="14"></line><line x1="10.88" y1="21.94" x2="15.46" y2="14"></line></svg>
-              Turpināt ar Google
+              Reģistrēties ar Google
             </button>
             
             <p class="auth-footer">
-              Jums nav konta? <a href="signup.php" class="auth-link">Sign up</a>
+              Jau ir konts? <a href="login.php" class="auth-link">Pieslēgties</a>
             </p>
           </form>
         </div>
       </div>
     </section>
+    
   </main>
   
   <footer class="footer">
@@ -248,7 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   <script src="script.js"></script>
   <script>
-    // Только для визуальных эффектов (показ/скрытие пароля)
+    // Только для визуальных эффектов (показ/скрытие пароля и индикатор силы пароля)
     document.addEventListener('DOMContentLoaded', function() {
       // Toggle password visibility
       document.querySelectorAll('.toggle-password').forEach(button => {
@@ -266,6 +318,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           }
         });
       });
+      
+      // Password strength meter
+      const passwordInput = document.getElementById('password');
+      const strengthBar = document.querySelector('.strength-bar');
+      
+      if (passwordInput && strengthBar) {
+        passwordInput.addEventListener('input', function() {
+          const password = this.value;
+          let strength = 0;
+          
+          if (password.length > 6) strength++;
+          if (password.length > 10) strength++;
+          if (/[0-9]/.test(password)) strength++;
+          if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+          if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) strength++;
+          
+          strength = Math.min(4, strength);
+          
+          // Update the strength bar
+          strengthBar.style.width = `${(strength / 4) * 100}%`;
+          
+          // Change color based on strength
+          if (strength === 0) {
+            strengthBar.style.backgroundColor = '#ef4444'; // Red
+          } else if (strength === 1) {
+            strengthBar.style.backgroundColor = '#f97316'; // Orange
+          } else if (strength === 2) {
+            strengthBar.style.backgroundColor = '#eab308'; // Yellow
+          } else if (strength === 3) {
+            strengthBar.style.backgroundColor = '#84cc16'; // Light green
+          } else {
+            strengthBar.style.backgroundColor = '#22c55e'; // Green
+          }
+        });
+      }
     });
   </script>
 </body>

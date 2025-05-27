@@ -224,21 +224,21 @@
     <div class="container">
       <div class="nav-wrapper">
         <!-- Logo & Brand -->
-        <a href="index.html" class="brand">
+        <a href="index.php" class="brand">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
           <h1 class="brand-name">BookSwap</h1>
         </a>
         
         <!-- Desktop Navigation -->
         <nav class="desktop-nav">
-          <a href="browse.html" class="nav-link">Pārlūkot grāmatas</a>
-          <a href="how-it-works.html" class="nav-link">Kā tas strādā</a>
+          <a href="browse.php" class="nav-link">Pārlūkot grāmatas</a>
+          <a href="how-it-works.php" class="nav-link">Kā tas strādā</a>
         </nav>
         
         <!-- Desktop Actions -->
         <div class="desktop-actions">
-          <a href="login.html" class="btn btn-outline">Pieslēgties</a>
-          <a href="register.html" class="btn btn-primary">Reģistrēties</a>
+          <a href="login.php" class="btn btn-outline">Pieslēgties</a>
+          <a href="signup.php" class="btn btn-primary">Reģistrēties</a>
         </div>
         
         <!-- Mobile Menu Button -->
@@ -249,11 +249,11 @@
       
       <!-- Mobile Menu (Hidden by default) -->
       <div class="mobile-menu" id="mobileMenu">
-        <a href="browse.html" class="mobile-nav-link">Pārlūkot grāmatas</a>
-        <a href="how-it-works.html" class="mobile-nav-link">Kā tas strādā</a>
+        <a href="browse.php" class="mobile-nav-link">Pārlūkot grāmatas</a>
+        <a href="how-it-works.php" class="mobile-nav-link">Kā tas strādā</a>
         <div class="mobile-actions">
-          <a href="login.html" class="btn btn-outline mobile-btn">Pieslēgties</a>
-          <a href="register.html" class="btn btn-primary mobile-btn">Reģistrēties</a>
+          <a href="login.php" class="btn btn-outline mobile-btn">Pieslēgties</a>
+          <a href="signup.php" class="btn btn-primary mobile-btn">Reģistrēties</a>
         </div>
       </div>
     </div>
@@ -350,8 +350,8 @@
           
           <div class="gdpr-card">
             <h3>Sazinieties ar mums tieši</h3>
-            <p>Nosūtiet e-pastu mūsu Datu aizsardzības speciālistam uz dpo@bookswap.com vai izmantojiet mūsu <a href="contact-us.html">kontaktu formu</a>.</p>
-            <a href="contact-us.html" class="gdpr-btn">Kontaktu forma</a>
+            <p>Nosūtiet e-pastu mūsu Datu aizsardzības speciālistam uz dpo@bookswap.com vai izmantojiet mūsu <a href="contact-us.php">kontaktu formu</a>.</p>
+            <a href="contact-us.php" class="gdpr-btn">Kontaktu forma</a>
           </div>
           
           <h3>Caur savu kontu</h3>
@@ -427,7 +427,7 @@
       </div>
       
       <div class="gdpr-action">
-        <a href="privacy-policy.html" class="btn">Skatīt mūsu Privātuma politiku</a>
+        <a href="privacy-policy.php" class="btn">Skatīt mūsu Privātuma politiku</a>
       </div>
     </div>
   </main>
@@ -437,7 +437,7 @@
       <div class="footer-grid">
         <!-- Brand Section -->
         <div class="footer-brand">
-          <a href="index.html" class="brand">
+          <a href="index.php" class="brand">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
             <h2 class="brand-name">BookSwap</h2>
           </a>
@@ -459,10 +459,10 @@
         <div class="footer-links">
           <h3 class="footer-title">Ātrās saites</h3>
           <ul>
-            <li><a href="browse.html">Pārlūkot grāmatas</a></li>
-            <li><a href="how-it-works.html">Kā tas strādā</a></li>
-            <li><a href="signup.html">Pievienoties BookSwap</a></li>
-            <li><a href="login.html">Pieslēgties</a></li>
+            <li><a href="browse.php">Pārlūkot grāmatas</a></li>
+            <li><a href="how-it-works.php">Kā tas strādā</a></li>
+            <li><a href="signup.php">Pievienoties BookSwap</a></li>
+            <li><a href="login.php">Pieslēgties</a></li>
           </ul>
         </div>
         
@@ -470,10 +470,10 @@
         <div class="footer-links">
           <h3 class="footer-title">Palīdzība un atbalsts</h3>
           <ul>
-            <li><a href="faq.html">BUJ</a></li>
-            <li><a href="contact-us.html">Sazināties ar mums</a></li>
-            <li><a href="safety-tips.html">Drošības padomi</a></li>
-            <li><a href="report-issue.html">Ziņot par problēmu</a></li>
+            <li><a href="faq.php">BUJ</a></li>
+            <li><a href="contact-us.php">Sazināties ar mums</a></li>
+            <li><a href="safety-tips.php">Drošības padomi</a></li>
+            <li><a href="report-issue.php">Ziņot par problēmu</a></li>
           </ul>
         </div>
         
@@ -481,10 +481,10 @@
         <div class="footer-links">
           <h3 class="footer-title">Juridiskā informācija</h3>
           <ul>
-            <li><a href="terms.html">Pakalpojumu noteikumi</a></li>
-            <li><a href="privacy-policy.html">Privātuma politika</a></li>
-            <li><a href="cookies.html">Sīkfailu politika</a></li>
-            <li><a href="gdpr.html">VDAR</a></li>
+            <li><a href="terms.php">Pakalpojumu noteikumi</a></li>
+            <li><a href="privacy-policy.php">Privātuma politika</a></li>
+            <li><a href="cookies.php">Sīkfailu politika</a></li>
+            <li><a href="gdpr.php">VDAR</a></li>
           </ul>
         </div>
       </div>

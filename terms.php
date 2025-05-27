@@ -12,21 +12,21 @@
     <div class="container">
       <div class="nav-wrapper">
         <!-- Logo & Brand -->
-        <a href="index.html" class="brand">
+        <a href="index.php" class="brand">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
           <h1 class="brand-name">BookSwap</h1>
         </a>
         
         <!-- Desktop Navigation -->
         <nav class="desktop-nav">
-          <a href="browse.html" class="nav-link">Pārlūkot grāmatas</a>
-          <a href="how-it-works.html" class="nav-link">Kā tas darbojas</a>
+          <a href="browse.php" class="nav-link">Pārlūkot grāmatas</a>
+          <a href="how-it-works.php" class="nav-link">Kā tas darbojas</a>
         </nav>
         
         <!-- Desktop Actions -->
         <div class="desktop-actions">
-          <a href="login.html" class="btn btn-outline">Pieslēgties</a>
-          <a href="signup.html" class="btn btn-primary">Reģistrēties</a>
+          <a href="login.php" class="btn btn-outline">Pieslēgties</a>
+          <a href="signup.php" class="btn btn-primary">Reģistrēties</a>
         </div>
         
         <!-- Mobile Menu Button -->
@@ -37,11 +37,11 @@
       
       <!-- Mobile Menu (Hidden by default) -->
       <div class="mobile-menu" id="mobileMenu">
-        <a href="browse.html" class="mobile-nav-link">Pārlūkot grāmatas</a>
-        <a href="how-it-works.html" class="mobile-nav-link">Kā tas darbojas</a>
+        <a href="browse.php" class="mobile-nav-link">Pārlūkot grāmatas</a>
+        <a href="how-it-works.php" class="mobile-nav-link">Kā tas darbojas</a>
         <div class="mobile-actions">
-          <a href="login.html" class="btn btn-outline mobile-btn">Pieslēgties</a>
-          <a href="signup.html" class="btn btn-primary mobile-btn">Reģistrēties</a>
+          <a href="login.php" class="btn btn-outline mobile-btn">Pieslēgties</a>
+          <a href="signup.php" class="btn btn-primary mobile-btn">Reģistrēties</a>
         </div>
       </div>
     </div>
@@ -78,7 +78,7 @@
             <div class="terms-contact">
               <h3>Jautājumi?</h3>
               <p>Ja jums ir jautājumi par mūsu Lietošanas noteikumiem, lūdzu, sazinieties ar mums:</p>
-              <a href="contact-us.html" class="btn btn-outline btn-sm">Sazinieties ar mums</a>
+              <a href="contact-us.php" class="btn btn-outline btn-sm">Sazinieties ar mums</a>
             </div>
           </div>
     
@@ -173,7 +173,7 @@
     
             <div class="terms-final">
               <p>Izmantojot BookSwap, jūs apliecināt, ka esat izlasījis, sapratis un piekritis šiem Lietošanas noteikumiem.</p>
-              <p>Ja jums ir kādi jautājumi, sazinieties ar mums pa e-pastu <a href="mailto:legal@bookswap.example.com">legal@bookswap.example.com</a> vai izmantojot <a href="contact-us.html">saziņas formu</a>.</p>
+              <p>Ja jums ir kādi jautājumi, sazinieties ar mums pa e-pastu <a href="mailto:legal@bookswap.example.com">legal@bookswap.example.com</a> vai izmantojot <a href="contact-us.php">saziņas formu</a>.</p>
             </div>
           </div>
         </div>
@@ -187,13 +187,13 @@
           <h2 class="cta-title">Gatavs sākt grāmatu apmaiņu?</h2>
           <p class="cta-description">Pievienojies mūsu kopienai jau šodien un satiec tūkstošiem grāmatu mīļotāju, kuri ir gatavi apmainīties ar stāstiem un piedzīvojumiem.</p>
           <div class="cta-buttons">
-            <a href="register.html" class="btn btn-white">
+            <a href="signup.php" class="btn btn-white">
               Reģistrēties tagad
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
             </a>
-            <a href="browse.html" class="btn btn-outline-white">Pārlūkot grāmatas</a>
+            <a href="browse.php" class="btn btn-outline-white">Pārlūkot grāmatas</a>
           </div>
-          <p class="cta-signin">Jau ir konts? <a href="login.html">Pieslēgties</a></p>
+          <p class="cta-signin">Jau ir konts? <a href="login.php">Pieslēgties</a></p>
         </div>
       </div>
     </section>    
@@ -204,7 +204,7 @@
       <div class="footer-grid">
         <!-- Brand Section -->
         <div class="footer-brand">
-          <a href="index.html" class="brand">
+          <a href="index.php" class="brand">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
             <h2 class="brand-name">BookSwap</h2>
           </a>
@@ -226,10 +226,10 @@
         <div class="footer-links">
           <h3 class="footer-title">Ātrās saites</h3>
           <ul>
-            <li><a href="browse.html">Pārlūkot grāmatas</a></li>
-            <li><a href="how-it-works.html">Kā tas strādā</a></li>
-            <li><a href="signup.html">Pievienoties BookSwap</a></li>
-            <li><a href="login.html">Pieslēgties</a></li>
+            <li><a href="browse.php">Pārlūkot grāmatas</a></li>
+            <li><a href="how-it-works.php">Kā tas strādā</a></li>
+            <li><a href="signup.php">Pievienoties BookSwap</a></li>
+            <li><a href="login.php">Pieslēgties</a></li>
           </ul>
         </div>
         
@@ -237,10 +237,10 @@
         <div class="footer-links">
           <h3 class="footer-title">Palīdzība un atbalsts</h3>
           <ul>
-            <li><a href="faq.html">BUJ</a></li>
-            <li><a href="contact-us.html">Sazināties ar mums</a></li>
-            <li><a href="safety-tips.html">Drošības padomi</a></li>
-            <li><a href="report-issue.html">Ziņot par problēmu</a></li>
+            <li><a href="faq.php">BUJ</a></li>
+            <li><a href="contact-us.php">Sazināties ar mums</a></li>
+            <li><a href="safety-tips.php">Drošības padomi</a></li>
+            <li><a href="report-issue.php">Ziņot par problēmu</a></li>
           </ul>
         </div>
         
@@ -248,10 +248,10 @@
         <div class="footer-links">
           <h3 class="footer-title">Juridiskā informācija</h3>
           <ul>
-            <li><a href="terms.html">Pakalpojumu noteikumi</a></li>
-            <li><a href="privacy-policy.html">Privātuma politika</a></li>
-            <li><a href="cookies.html">Sīkfailu politika</a></li>
-            <li><a href="gdpr.html">VDAR</a></li>
+            <li><a href="terms.php">Pakalpojumu noteikumi</a></li>
+            <li><a href="privacy-policy.php">Privātuma politika</a></li>
+            <li><a href="cookies.php">Sīkfailu politika</a></li>
+            <li><a href="gdpr.php">VDAR</a></li>
           </ul>
         </div>
       </div>

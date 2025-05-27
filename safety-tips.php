@@ -12,21 +12,21 @@
     <div class="container">
       <div class="nav-wrapper">
         <!-- Logo & Brand -->
-        <a href="index.html" class="brand">
+        <a href="index.php" class="brand">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
           <h1 class="brand-name">BookSwap</h1>
         </a>
         
         <!-- Desktop Navigation -->
         <nav class="desktop-nav">
-          <a href="browse.html" class="nav-link">Pārlūkot grāmatas</a>
-          <a href="how-it-works.html" class="nav-link">Kā tas darbojas</a>
+          <a href="browse.php" class="nav-link">Pārlūkot grāmatas</a>
+          <a href="how-it-works.php" class="nav-link">Kā tas darbojas</a>
         </nav>
         
         <!-- Desktop Actions -->
         <div class="desktop-actions">
-          <a href="login.html" class="btn btn-outline">Pieslēgties</a>
-          <a href="signup.html" class="btn btn-primary">Reģistrēties</a>
+          <a href="login.php" class="btn btn-outline">Pieslēgties</a>
+          <a href="signup.php" class="btn btn-primary">Reģistrēties</a>
         </div>
         
         <!-- Mobile Menu Button -->
@@ -37,11 +37,11 @@
       
       <!-- Mobile Menu (Hidden by default) -->
       <div class="mobile-menu" id="mobileMenu">
-        <a href="browse.html" class="mobile-nav-link">Pārlūkot grāmatas</a>
-        <a href="how-it-works.html" class="mobile-nav-link">Kā tas darbojas</a>
+        <a href="browse.php" class="mobile-nav-link">Pārlūkot grāmatas</a>
+        <a href="how-it-works.php" class="mobile-nav-link">Kā tas darbojas</a>
         <div class="mobile-actions">
-          <a href="login.html" class="btn btn-outline mobile-btn">Pieslēgties</a>
-          <a href="signup.html" class="btn btn-primary mobile-btn">Reģistrēties</a>
+          <a href="login.php" class="btn btn-outline mobile-btn">Pieslēgties</a>
+          <a href="signup.php" class="btn btn-primary mobile-btn">Reģistrēties</a>
         </div>
       </div>
     </div>
