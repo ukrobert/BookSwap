@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Если нет ошибок, проверяем учетные данные
     if (empty($errors)) {
         // Ищем пользователя по email
-        $stmt = $savienojums->prepare("SELECT LietotajsID, Lietotajvards, E_pasts, Parole FROM bookswap_users WHERE E_pasts = ?");
+        $stmt = $savienojums->prepare("SELECT LietotajsID, Lietotajvards, E_pasts, Parole, ProfilaAttels FROM bookswap_users WHERE E_pasts = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -47,18 +47,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['user_name'] = $user['Lietotajvards'];
                 $_SESSION['user_email'] = $user['E_pasts'];
                 $_SESSION['is_logged_in'] = true;
+                $_SESSION['user_profile_photo'] = $user['ProfilaAttels']; // Сохраняем путь к фото профиля
                 
                 // Если выбрано "запомнить меня", устанавливаем cookie
                 if ($rememberMe) {
                     $token = bin2hex(random_bytes(32)); // Генерируем случайный токен
                     
                     // Хешируем токен для хранения в БД
-                    $hashedToken = password_hash($token, PASSWORD_DEFAULT);
+                    // $hashedToken = password_hash($token, PASSWORD_DEFAULT);
                     
                     // Сохраняем токен в БД (предполагается, что есть таблица для токенов)
                     // В данном случае, для простоты, мы просто установим cookie
                     
                     // Устанавливаем cookie на 30 дней
+                    // Пример сохранения токена в БД (вам нужно будет адаптировать это)
+                    // $expiryDate = date('Y-m-d H:i:s', time() + 60*60*24*30);
+                    // $tokenStmt = $savienojums->prepare("INSERT INTO bookswap_remember_tokens (user_id, token, expires_at) VALUES (?, ?, ?)");
+                    // $tokenStmt->bind_param("iss", $user['LietotajsID'], $hashedToken, $expiryDate);
+                    // $tokenStmt->execute();
+                    // $tokenStmt->close();
+
                     setcookie('bookswap_remember', $user['LietotajsID'] . ':' . $token, time() + 60*60*24*30, '/', '', false, true);
                 }
                 
@@ -75,7 +83,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -86,43 +93,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link rel="stylesheet" href="auth.css">
 </head>
 <body>
-  <header class="navigation">
-    <div class="container">
-      <div class="nav-wrapper">
-        <!-- Logo & Brand -->
-        <a href="index.php" class="brand">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-          <h1 class="brand-name">BookSwap</h1>
-        </a>
-        
-        <!-- Desktop Navigation -->
-        <nav class="desktop-nav">
-          <a href="browse.php" class="nav-link">Pārlūkot grāmatas</a>
-          <a href="how-it-works.php" class="nav-link">Kā tas darbojas</a>
-        </nav>
-        
-        <!-- Desktop Actions -->
-        <div class="desktop-actions">
-          
+    <header class="navigation">
+        <div class="container">
+            <div class="nav-wrapper">
+                <!-- Logo & Brand -->
+                <a href="index.php" class="brand">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                    <h1 class="brand-name">BookSwap</h1>
+                </a>
+                
+                <!-- Desktop Navigation -->
+                <nav class="desktop-nav">
+                    <a href="browse.php" class="nav-link">Pārlūkot grāmatas</a>
+                    <a href="how-it-works.php" class="nav-link">Kā tas darbojas</a>
+                </nav>
+                
+                <!-- Desktop Actions -->
+                <div class="desktop-actions">
+                    <?php if (isLoggedIn()): ?>
+                        <?php
+                        $profilePicPath = $_SESSION['user_profile_photo'] ?? '';
+                        $userNameInitial = !empty($_SESSION['user_name']) ? strtoupper(mb_substr($_SESSION['user_name'], 0, 1, 'UTF-8')) : 'U';
+                        ?>
+                        <div class="profile-button-header-wrapper">
+                            <a href="profile.php" class="profile-button-header" aria-label="User Profile">
+                                <div class="profile-button-photo-header">
+                                    <?php if (!empty($profilePicPath) && file_exists($profilePicPath)): ?>
+                                        <img src="<?php echo htmlspecialchars($profilePicPath); ?>?t=<?php echo time(); ?>" alt="Profils">
+                                    <?php else: ?>
+                                        <div class="profile-button-placeholder-header">
+                                            <?php echo htmlspecialchars($userNameInitial); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </a>
+                            <form method="POST" action="logout.php" style="display: inline;">
+                                <button type="submit" class="btn btn-outline">Izlogoties</button>
+                            </form>
+                        </div>
+                    <?php else: ?>
+                        <a href="login.php" class="btn btn-outline">Pieslēgties</a>
+                        <a href="signup.php" class="btn btn-primary">Reģistrēties</a>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Mobile Menu Button -->
+                <button class="mobile-menu-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <!-- Mobile Menu (Hidden by default) -->
+            <div class="mobile-menu" id="mobileMenu">
+                <a href="browse.php" class="mobile-nav-link">Pārlūkot grāmatas</a>
+                <a href="how-it-works.php" class="mobile-nav-link">Kā tas darbojas</a>
+                <div class="mobile-actions">
+                    <?php if (isLoggedIn()): ?>
+                        <a href="profile.php" class="btn btn-primary mobile-btn" style="margin-bottom: var(--spacing-2);">Mans Profils</a>
+                        <form method="POST" action="logout.php" style="display: block; width: 100%;">
+                            <button type="submit" class="btn btn-outline mobile-btn">Izlogoties</button>
+                        </form>
+                    <?php else: ?>
+                        <a href="login.php" class="btn btn-outline mobile-btn">Pieslēgties</a>
+                        <a href="signup.php" class="btn btn-primary mobile-btn">Reģistrēties</a>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
-        
-        <!-- Mobile Menu Button -->
-        <button class="mobile-menu-button">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-        </button>
-      </div>
-      
-      <!-- Mobile Menu (Hidden by default) -->
-      <div class="mobile-menu" id="mobileMenu">
-        <a href="browse.php" class="nav-link">Pārlūkot grāmatas</a>
-        <a href="how-it-works.php" class="nav-link">Kā tas darbojas</a>
-        
-        <div class="mobile-actions">
-          
-        </div>
-      </div>
-    </div>
-  </header>
+    </header>
 
   <main>
     <section class="auth-section">
@@ -241,7 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
       
       <div class="footer-bottom">
-        <p>&copy; <span id="currentYear"></span> BookSwap. Visas tiesības aizsargātas.</p>
+        <p>© <span id="currentYear"></span> BookSwap. Visas tiesības aizsargātas.</p>
       </div>
     </div>
   </footer>

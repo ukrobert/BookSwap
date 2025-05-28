@@ -1534,3 +1534,76 @@ input, textarea, select {
   font-size: 1rem;
   color: var(--color-burgundy);
 }
+
+
+.profile-button-header-wrapper { /* New wrapper for flex alignment */
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+}
+
+.profile-button-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center; /* Center content (initial) */
+  padding: var(--spacing-1); /* Minimal padding around the photo div */
+  border-radius: var(--radius-full);
+  background-color: transparent;
+  border: 1px solid var(--color-paper);
+  transition: background-color 0.2s, border-color 0.2s;
+  cursor: pointer;
+  height: 40px; /* Match typical button height */
+  width: 40px;  /* Make it circular */
+  box-sizing: border-box; /* Ensure padding and border are included in width/height */
+}
+
+.profile-button-header:hover {
+  background-color: var(--color-light-gray);
+  border-color: var(--color-gray);
+}
+
+.profile-button-photo-header {
+  width: 30px;  /* Slightly smaller than the button for a nice border effect */
+  height: 30px;
+  border-radius: 50%;
+  background-color: var(--color-paper); /* Fallback background */
+  overflow: hidden;
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+}
+
+.profile-button-photo-header img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-button-placeholder-header {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-darkwood); 
+  background-color: var(--color-light-gray); 
+  font-weight: bold;
+  font-size: 0.9rem; /* Adjust as needed for one initial */
+  line-height: 30px; /* Match height */
+  text-align: center;
+}
+
+/* Adjust desktop actions to align profile pic and logout button */
+.desktop-actions {
+    display: flex;
+    align-items: center; /* Vertically align items */
+    gap: var(--spacing-3); /* Space between profile pic and logout button */
+}
+
+.mobile-actions .btn { /* Ensure logout button in mobile takes full width */
+    width: 100%;
+    text-align: center;
+}
+.mobile-actions form .btn {
+    margin-top: var(--spacing-2);
+}

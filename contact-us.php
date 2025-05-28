@@ -1,3 +1,8 @@
+<?php
+require_once 'session_check.php'; 
+require_once 'connect_db.php';
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -148,43 +153,73 @@
 </head>
 <body>
   <header class="navigation">
-    <div class="container">
-      <div class="nav-wrapper">
-        <!-- Logo & Brand -->
-        <a href="index.php" class="brand">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-          <h1 class="brand-name">BookSwap</h1>
-        </a>
-        
-        <!-- Desktop Navigation -->
-        <nav class="desktop-nav">
-          <a href="browse.php" class="nav-link">Pārlūkot grāmatas</a>
-          <a href="how-it-works.php" class="nav-link">Kā tas darbojas</a>
-        </nav>
-        
-        <!-- Desktop Actions -->
-        <div class="desktop-actions">
-          <a href="login.php" class="btn btn-outline">Pieslēgties</a>
-          <a href="signup.php" class="btn btn-primary">Reģistrēties</a>
+        <div class="container">
+            <div class="nav-wrapper">
+                <!-- Logo & Brand -->
+                <a href="index.php" class="brand">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                    <h1 class="brand-name">BookSwap</h1>
+                </a>
+                
+                <!-- Desktop Navigation -->
+                <nav class="desktop-nav">
+                    <a href="browse.php" class="nav-link">Pārlūkot grāmatas</a>
+                    <a href="how-it-works.php" class="nav-link">Kā tas darbojas</a>
+                </nav>
+                
+                <!-- Desktop Actions -->
+                <div class="desktop-actions">
+                    <?php if (isLoggedIn()): ?>
+                        <?php
+                        $profilePicPath = $_SESSION['user_profile_photo'] ?? '';
+                        $userNameInitial = !empty($_SESSION['user_name']) ? strtoupper(mb_substr($_SESSION['user_name'], 0, 1)) : 'U'; // Используем mb_substr для корректной работы с UTF-8
+                        ?>
+                        <div class="profile-button-header-wrapper">
+                            <a href="profile.php" class="profile-button-header" aria-label="User Profile">
+                                <div class="profile-button-photo-header">
+                                    <?php if (!empty($profilePicPath) && file_exists($profilePicPath)): ?>
+                                        <img src="<?php echo htmlspecialchars($profilePicPath); ?>" alt="Profils">
+                                    <?php else: ?>
+                                        <div class="profile-button-placeholder-header">
+                                            <?php echo htmlspecialchars($userNameInitial); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </a>
+                            <form method="POST" action="logout.php" style="display: inline;">
+                                <button type="submit" class="btn btn-outline">Izlogoties</button>
+                            </form>
+                        </div>
+                    <?php else: ?>
+                        <a href="login.php" class="btn btn-outline">Pieslēgties</a>
+                        <a href="signup.php" class="btn btn-primary">Reģistrēties</a>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Mobile Menu Button -->
+                <button class="mobile-menu-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <!-- Mobile Menu (Hidden by default) -->
+            <div class="mobile-menu" id="mobileMenu">
+                <a href="browse.php" class="mobile-nav-link">Pārlūkot grāmatas</a>
+                <a href="how-it-works.php" class="mobile-nav-link">Kā tas darbojas</a>
+                <div class="mobile-actions">
+                    <?php if (isLoggedIn()): ?>
+                        <a href="profile.php" class="btn btn-primary mobile-btn" style="margin-bottom: var(--spacing-2);">Mans Profils</a>
+                        <form method="POST" action="logout.php" style="display: block; width: 100%;">
+                            <button type="submit" class="btn btn-outline mobile-btn">Izlogoties</button>
+                        </form>
+                    <?php else: ?>
+                        <a href="login.php" class="btn btn-outline mobile-btn">Pieslēgties</a>
+                        <a href="signup.php" class="btn btn-primary mobile-btn">Reģistrēties</a>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
-        
-        <!-- Mobile Menu Button -->
-        <button class="mobile-menu-button">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-        </button>
-      </div>
-      
-      <!-- Mobile Menu (Hidden by default) -->
-      <div class="mobile-menu" id="mobileMenu">
-        <a href="browse.php" class="mobile-nav-link">Pārlūkot grāmatas</a>
-        <a href="how-it-works.php" class="mobile-nav-link">Kā tas darbojas</a>
-        <div class="mobile-actions">
-          <a href="login.php" class="btn btn-outline mobile-btn">Pieslēgties</a>
-          <a href="signup.php" class="btn btn-primary mobile-btn">Reģistrēties</a>
-        </div>
-      </div>
-    </div>
-  </header>
+    </header>
 
   <main>
     <section class="contact-container">

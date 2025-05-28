@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   if (!authData) {
     // If not logged in, redirect to login page
-    window.location.href = 'login.php';
+    window.location.href = 'login.html';
     return;
   }
   
@@ -41,7 +41,7 @@ function setupLogout() {
     localStorage.removeItem('bookswap_auth');
     
     // Redirect to login page
-    window.location.href = 'login.php';
+    window.location.href = 'login.html';
   };
   
   if (logoutBtn) logoutBtn.addEventListener('click', logoutHandler);
