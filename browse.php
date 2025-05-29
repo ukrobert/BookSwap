@@ -79,7 +79,7 @@ try {
     <link rel="stylesheet" href="browse.css">
   </head>
 
-  <body>
+  <body data-current-user-id="<?php echo isLoggedIn() ? htmlspecialchars($_SESSION['user_id']) : '0'; ?>">
     <div id="root">
       <!-- Navigation -->
       <header class="navigation">
@@ -614,5 +614,6 @@ try {
         }
     });
     </script>
+    <script src="chat.js?v=<?php echo time(); // Cache busting ?>"></script>
   </body>
 </html>
