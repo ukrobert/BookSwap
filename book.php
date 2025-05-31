@@ -302,7 +302,56 @@ if ($book_id && !$book_not_found_error) {
         <?php endif; ?>
       </main>
 
-      <footer class="footer"><!-- Footer code as before --></footer>
+      <footer class="footer">
+        <div class="container">
+          <div class="footer-grid">
+            <div class="footer-brand">
+              <a href="index.php" class="brand">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                <h2 class="brand-name">BookSwap</h2>
+              </a>
+              <p>Sazinieties ar citiem lasītājiem un apmainieties ar grāmatām, kuras mīlat.</p>
+              <div class="social-links">
+                 <a href="#" class="social-link"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg></a>
+                <a href="#" class="social-link"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"></path></svg></a>
+                <a href="#" class="social-link"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg></a>
+              </div>
+            </div>
+            <div class="footer-links">
+              <h3 class="footer-title">Ātrās saites</h3>
+              <ul>
+                <li><a href="browse.php">Pārlūkot grāmatas</a></li>
+                <li><a href="how-it-works.php">Kā tas darbojas</a></li>
+                 <?php if (!isLoggedIn()): ?>
+                <li><a href="signup.php">Pievienoties BookSwap</a></li>
+                <li><a href="login.php">Pieslēgties</a></li>
+                 <?php endif; ?>
+              </ul>
+            </div>
+            <div class="footer-links">
+              <h3 class="footer-title">Palīdzība un atbalsts</h3>
+              <ul>
+                <li><a href="faq.php">BUJ</a></li>
+                <li><a href="contact-us.php">Sazināties ar mums</a></li>
+                <li><a href="safety-tips.php">Drošības padomi</a></li>
+                <li><a href="report-issue.php">Ziņot par problēmu</a></li>
+              </ul>
+            </div>
+            <div class="footer-links">
+              <h3 class="footer-title">Juridiskā informācija</h3>
+              <ul>
+                <li><a href="terms.php">Pakalpojumu noteikumi</a></li>
+                <li><a href="privacy-policy.php">Privātuma politika</a></li>
+                <li><a href="cookies.php">Sīkfailu politika</a></li>
+                <li><a href="gdpr.php">VDAR</a></li>
+              </ul>
+            </div>
+          </div>
+          <div class="footer-bottom">
+            <p>© <span id="currentYear"></span> BookSwap. Visas tiesības aizsargātas.</p>
+          </div>
+        </div>
+      </footer>
     </div>
 
     <div id="toast" class="toast">
@@ -576,7 +625,7 @@ if ($book_id && !$book_not_found_error) {
     <link rel="stylesheet" href="chat.css?v=<?php echo time(); ?>">
     <script src="chat.js?v=<?php echo time(); ?>"></script>
 
-    <div id="chat-widget-container" class="<?php echo !isLoggedIn() ? 'hidden' : ''; ?>">
+    <div id="chat-widget-container">
     <div id="chat-toggle-button" title="Atvērt čatu">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
@@ -594,10 +643,12 @@ if ($book_id && !$book_not_found_error) {
         </div>
         <div id="chat-body">
             <div id="chat-conversation-list">
+                <!-- Conversations will be loaded here by JS -->
                 <div class="loading-spinner hidden"><div class="spinner"></div></div>
             </div>
             <div id="chat-message-area" class="hidden">
                 <div id="chat-messages-display">
+                    <!-- Messages will be loaded here by JS -->
                      <div class="loading-spinner hidden"><div class="spinner"></div></div>
                 </div>
                 <form id="chat-message-form">

@@ -1,0 +1,387 @@
+#chat-widget-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+#chat-toggle-button {
+    background-color: var(--color-burgundy);
+    color: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.3s, transform 0.3s;
+}
+#chat-toggle-button:hover {
+    background-color: hsl(17, 65%, 30%);
+    transform: scale(1.1);
+}
+#chat-toggle-button svg {
+    width: 28px;
+    height: 28px;
+}
+#chat-global-unread-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: red;
+    color: white;
+    border-radius: 50%;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 4px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border: 2px solid white;
+    box-sizing: border-box;
+}
+
+#chat-window {
+    width: 350px;
+    height: 500px; 
+    background-color: white;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.25);
+    display: flex; 
+    flex-direction: column; 
+    overflow: hidden; 
+    position: absolute; 
+    bottom: 75px; 
+    right: 0;
+    border: 1px solid var(--color-paper);
+}
+#chat-window.hidden {
+    display: none;
+}
+
+#chat-header {
+    background-color: var(--color-darkwood);
+    color: white;
+    padding: 10px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-serif);
+    flex-shrink: 0; 
+}
+#chat-window-title {
+    font-weight: 600;
+    font-size: 1.1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-grow: 1; 
+    text-align: center; 
+}
+#chat-header.message-view #chat-window-title { 
+    text-align: left;
+    margin-left: 10px; 
+}
+#chat-back-button { 
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.3rem; 
+    cursor: pointer;
+    padding: 5px; 
+    line-height: 1;
+    /* display: none; // Управляется JS */
+}
+#chat-close-button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 5px;
+}
+
+#chat-body {
+    flex-grow: 1; 
+    display: flex; 
+    flex-direction: column; 
+    position: relative; /* Для корректного позиционирования дочерних элементов, если они используют absolute */
+    overflow: hidden; /* Родитель должен обрезать контент, который выходит за его пределы, но дать детям скролл */
+}
+
+#chat-conversation-list {
+    flex-grow: 1; 
+    overflow-y: auto; /* Включает вертикальный скроллбар, когда контент превышает высоту */
+    /* border-bottom убран, так как он будет только если форма ввода снизу */
+}
+.chat-conversation-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--color-paper);
+    transition: background-color 0.2s;
+}
+.chat-conversation-item:last-child {
+    border-bottom: none;
+}
+.chat-conversation-item:hover {
+    background-color: var(--color-cream);
+}
+.chat-conversation-item.active-conversation {
+    background-color: hsl(35, 50%, 94%); /* Немного темнее, чем hover */
+}
+.conversation-item-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+    background-color: var(--color-light-gray);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.conversation-item-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.conversation-item-avatar .placeholder-initials {
+    font-weight: bold;
+    color: var(--color-darkwood);
+}
+.conversation-item-details {
+    flex-grow: 1;
+    overflow: hidden; 
+}
+.conversation-item-name {
+    font-weight: 500;
+    color: var(--color-darkwood);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.conversation-item-last-message {
+    font-size: 0.85rem;
+    color: var(--color-gray);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+.conversation-item-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-size: 0.75rem;
+    color: var(--color-gray);
+    margin-left: 10px;
+    min-width: 50px; 
+    flex-shrink: 0;
+}
+.conversation-item-time {
+    white-space: nowrap;
+}
+.conversation-item-unread-badge {
+    background-color: var(--color-burgundy);
+    color: white;
+    border-radius: 50%;
+    min-width: 18px; 
+    height: 18px;
+    padding: 0 3px; 
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-top: 4px;
+    box-sizing: border-box;
+}
+
+#chat-message-area {
+    flex-grow: 1; 
+    display: flex;
+    flex-direction: column; 
+    overflow: hidden; /* Сам message-area не скроллится, скроллится messages-display */
+    height: 100%; /* Занимает всю высоту родителя (chat-body) когда активен */
+}
+#chat-messages-display {
+    flex-grow: 1; 
+    padding: 15px;
+    overflow-y: auto; /* Включает вертикальный скроллбар */
+    background-color: var(--color-cream); 
+    /* Убраны display:flex и flex-direction:column, чтобы сообщения вели себя как обычные блоки */
+}
+.chat-message {
+    margin-bottom: 10px;
+    display: flex; /* Используем flex для выравнивания sent/received */
+    max-width: 85%; /* Сообщения чуть шире */
+    clear: both; /* Для корректного обтекания, если были бы float */
+}
+.chat-message .message-bubble {
+    padding: 8px 12px;
+    border-radius: 18px; /* Более округлые */
+    font-size: 0.9rem;
+    line-height: 1.4;
+    word-wrap: break-word; 
+    max-width: 100%; /* Пузырь не может быть шире сообщения */
+}
+.chat-message.sent {
+    margin-left: auto; /* Прижимает к правому краю */
+    justify-content: flex-end;
+}
+.chat-message.sent .message-bubble {
+    background-color: var(--color-teal);
+    color: white;
+    border-bottom-right-radius: 5px;
+}
+.chat-message.received {
+    margin-right: auto; /* Прижимает к левому краю */
+    justify-content: flex-start;
+}
+.chat-message.received .message-bubble {
+    background-color: #e9e9eb; 
+    color: var(--color-darkwood);
+    border-bottom-left-radius: 5px;
+}
+.message-timestamp {
+    font-size: 0.7rem;
+    color: var(--color-gray);
+    margin-top: 3px;
+    padding: 0 5px; 
+    width: 100%; /* Чтобы text-align работал */
+}
+.chat-message.sent .message-timestamp { text-align: right; }
+.chat-message.received .message-timestamp { text-align: left; }
+
+#chat-message-form {
+    display: flex;
+    padding: 10px;
+    border-top: 1px solid var(--color-paper);
+    background-color: white;
+    flex-shrink: 0; 
+}
+#chat-message-input {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid var(--color-paper);
+    border-radius: var(--radius-md);
+    margin-right: 10px;
+    font-size: 0.9rem;
+    resize: none; 
+    min-height: 40px;
+    line-height: 1.4; /* Для лучшего вида многострочного текста */
+}
+#chat-message-input:focus {
+    outline: none;
+    border-color: var(--color-teal);
+}
+#chat-send-button {
+    background-color: var(--color-burgundy);
+    color: white;
+    padding: 0 15px;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    transition: background-color 0.2s;
+    flex-shrink: 0; 
+}
+#chat-send-button:hover {
+    background-color: hsl(17, 65%, 30%);
+}
+#chat-send-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.hidden {
+    display: none !important;
+}
+
+@media (max-width: 400px) {
+    #chat-window {
+        width: 100%;
+        height: 100%; /* Окно чата занимает весь экран на мобильных */
+        max-height: 100%;
+        bottom: 0;
+        right: 0;
+        border-radius: 0;
+        position:fixed; 
+    }
+    #chat-toggle-button { /* Кнопка переключения может быть скрыта, когда чат открыт на весь экран */
+        /* bottom: 10px; */
+        /* right: 10px; */
+         display: none; /* Или оставить, если хотите, чтобы она была видна */
+    }
+     #chat-widget-container { 
+        bottom:0;
+        right:0;
+        width: 100%;
+        /* height: 100%; // Убрано, чтобы кнопка была поверх, если окно скрыто */
+    }
+}
+
+#chat-no-conversation-selected {
+    flex-grow: 1; 
+    display: flex; 
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--color-gray);
+    padding: 20px;
+    min-height: 150px; 
+}
+#chat-no-conversation-selected svg {
+    width: 50px;
+    height: 50px;
+    margin-bottom: 15px;
+    opacity: 0.5;
+}
+
+#chat-conversation-list .loading-spinner,
+#chat-messages-display .loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    font-size: 0.9em;
+    color: var(--color-gray);
+}
+.spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border-left-color: var(--color-burgundy);
+    animation: spin 1s ease infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#chat-conversation-list::-webkit-scrollbar,
+#chat-messages-display::-webkit-scrollbar {
+    width: 6px;
+}
+#chat-conversation-list::-webkit-scrollbar-track,
+#chat-messages-display::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.05); /* Чуть виднее фон скролла */
+    border-radius: 3px;
+}
+#chat-conversation-list::-webkit-scrollbar-thumb,
+#chat-messages-display::-webkit-scrollbar-thumb {
+    background: var(--color-gray);
+    border-radius: 3px;
+}
+#chat-conversation-list::-webkit-scrollbar-thumb:hover,
+#chat-messages-display::-webkit-scrollbar-thumb:hover {
+    background: var(--color-darkwood);
+}

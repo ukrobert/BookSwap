@@ -224,7 +224,7 @@ require_once 'connect_db.php';
     }
   </style>
 </head>
-<body>
+<body data-current-user-id="<?php echo isLoggedIn() ? htmlspecialchars($_SESSION['user_id']) : '0'; ?>">
   <header class="navigation">
         <div class="container">
             <div class="nav-wrapper">

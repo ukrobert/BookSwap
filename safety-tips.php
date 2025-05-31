@@ -12,7 +12,7 @@ require_once 'connect_db.php';
   <link rel="stylesheet" href="styles.css">
   <script src="safety-tips.js" defer></script>
 </head>
-<body class="paper-texture">
+<body class="paper-texture" data-current-user-id="<?php echo isLoggedIn() ? htmlspecialchars($_SESSION['user_id']) : '0'; ?>">
   <header class="navigation">
         <div class="container">
             <div class="nav-wrapper">
@@ -205,7 +205,7 @@ require_once 'connect_db.php';
       <div class="footer-grid">
         <!-- Brand Section -->
         <div class="footer-brand">
-          <a href="index.html" class="brand">
+          <a href="index.php" class="brand">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
             <h2 class="brand-name">BookSwap</h2>
           </a>
@@ -227,10 +227,10 @@ require_once 'connect_db.php';
         <div class="footer-links">
           <h3 class="footer-title">Ātrās saites</h3>
           <ul>
-            <li><a href="browse.html">Pārlūkot grāmatas</a></li>
-            <li><a href="how-it-works.html">Kā tas strādā</a></li>
-            <li><a href="signup.html">Pievienoties BookSwap</a></li>
-            <li><a href="login.html">Pieslēgties</a></li>
+            <li><a href="browse.php">Pārlūkot grāmatas</a></li>
+            <li><a href="how-it-works.php">Kā tas strādā</a></li>
+            <li><a href="signup.php">Pievienoties BookSwap</a></li>
+            <li><a href="login.php">Pieslēgties</a></li>
           </ul>
         </div>
         
@@ -238,10 +238,10 @@ require_once 'connect_db.php';
         <div class="footer-links">
           <h3 class="footer-title">Palīdzība un atbalsts</h3>
           <ul>
-            <li><a href="faq.html">BUJ</a></li>
-            <li><a href="contact-us.html">Sazināties ar mums</a></li>
-            <li><a href="safety-tips.html">Drošības padomi</a></li>
-            <li><a href="report-issue.html">Ziņot par problēmu</a></li>
+            <li><a href="faq.php">BUJ</a></li>
+            <li><a href="contact-us.php">Sazināties ar mums</a></li>
+            <li><a href="safety-tips.php">Drošības padomi</a></li>
+            <li><a href="report-issue.php">Ziņot par problēmu</a></li>
           </ul>
         </div>
         
@@ -249,10 +249,10 @@ require_once 'connect_db.php';
         <div class="footer-links">
           <h3 class="footer-title">Juridiskā informācija</h3>
           <ul>
-            <li><a href="terms.html">Pakalpojumu noteikumi</a></li>
-            <li><a href="privacy-policy.html">Privātuma politika</a></li>
-            <li><a href="cookies.html">Sīkfailu politika</a></li>
-            <li><a href="gdpr.html">VDAR</a></li>
+            <li><a href="terms.php">Pakalpojumu noteikumi</a></li>
+            <li><a href="privacy-policy.php">Privātuma politika</a></li>
+            <li><a href="cookies.php">Sīkfailu politika</a></li>
+            <li><a href="gdpr.php">VDAR</a></li>
           </ul>
         </div>
       </div>
@@ -262,5 +262,49 @@ require_once 'connect_db.php';
       </div>
     </div>
   </footer>
+
+  <div id="chat-widget-container">
+    <div id="chat-toggle-button" title="Atvērt čatu">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <span id="chat-global-unread-badge" class="hidden"></span>
+    </div>
+
+    <div id="chat-window" class="hidden">
+        <div id="chat-header">
+            <button id="chat-back-button" class="hidden" title="Atpakaļ uz sarakstēm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <span id="chat-window-title">Sarunas</span>
+            <button id="chat-close-button" title="Aizvērt čatu">×</button>
+        </div>
+        <div id="chat-body">
+            <div id="chat-conversation-list">
+                <!-- Conversations will be loaded here by JS -->
+                <div class="loading-spinner hidden"><div class="spinner"></div></div>
+            </div>
+            <div id="chat-message-area" class="hidden">
+                <div id="chat-messages-display">
+                    <!-- Messages will be loaded here by JS -->
+                     <div class="loading-spinner hidden"><div class="spinner"></div></div>
+                </div>
+                <form id="chat-message-form">
+                    <input type="text" id="chat-message-input" placeholder="Rakstiet ziņu..." autocomplete="off" disabled>
+                    <button type="submit" id="chat-send-button" disabled>Sūtīt</button>
+                </form>
+            </div>
+             <div id="chat-no-conversation-selected">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                <p>Izvēlieties sarunu, lai skatītu ziņas.</p>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Chat Widget End -->
+
+<!-- Подключаем CSS и JS для чата -->
+<link rel="stylesheet" href="chat.css?v=<?php echo time(); // Cache busting ?>">
+<script src="chat.js?v=<?php echo time(); // Cache busting ?>"></script>
 </body>
 </html>
