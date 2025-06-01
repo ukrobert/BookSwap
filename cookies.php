@@ -469,17 +469,14 @@ require_once 'connect_db.php';
           <p>Mēs laiku pa laikam varam atjaunināt šo sīkdatņu politiku. Par izmaiņām paziņosim, publicējot jauno versiju šajā lapā un atjauninot datumu 'Pēdējo reizi atjaunināts'.</p>
           <p>Iesakām periodiski pārskatīt šo politiku, lai sekotu izmaiņām. Izmaiņas stājas spēkā brīdī, kad tās tiek publicētas šajā lapā.</p>
         </section>
-        
+      
         <section id="cookie-contact" class="cookie-section fade-in">
-          <h2>Sazinies ar mums</h2>
-          <p>Ja tev ir jautājumi par mūsu sīkdatņu politiku, sazinies ar mums:</p>
-          <p>Email: privacy@bookswap.com</p>
-          <p>Postal Address: BookSwap, Inc.<br>123 Book Street<br>Reading, CA 94000<br>United States</p>
+          <h2>Sazinieties ar mums</h2>
+          <p>Ja jums ir kādi jautājumi, bažas vai atsauksmes par šo privātuma politiku vai mūsu privātuma praksēm, lūdzu, sazinieties ar mums šeit:</p>
+          <p>E-pasts: bookswap@gmail.com</p>
+          <p>Grāmatu iela 5<br>Rīga<br>Latvijas Republika</p>
         </section>
         
-        <div class="cookie-last-updated">
-          <p>Pēdējo reizi atjaunināts: 2025. gada 9. aprīlī</p>
-        </div>
       </div>
     </div>
   </main>

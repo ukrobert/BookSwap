@@ -259,22 +259,22 @@ require_once 'connect_db.php';
   <main>
     <div class="privacy-container">
       <div class="privacy-header">
-        <h1>Privacy Policy</h1>
-        <p>At BookSwap, we take your privacy seriously. This privacy policy describes what personal information we collect and how we use it.</p>
+        <h1>Privātuma politika</h1>
+        <p>Uzņēmumā BookSwap mēs nopietni izturamies pret jūsu konfidencialitāti. Šajā konfidencialitātes politikā ir aprakstīts, kādu personisko informāciju mēs apkopojam un kā to izmantojam.</p>
       </div>
       
       <div class="privacy-navigation">
-        <h3>Contents</h3>
+        <h3>Saturs</h3>
         <ul class="privacy-nav-links">
-          <li><a href="#information-collection" class="active">Information Collection</a></li>
-          <li><a href="#information-use">Use of Information</a></li>
-          <li><a href="#information-sharing">Information Sharing</a></li>
-          <li><a href="#cookies">Cookies</a></li>
-          <li><a href="#your-rights">Your Rights</a></li>
-          <li><a href="#data-security">Data Security</a></li>
-          <li><a href="#children-privacy">Children's Privacy</a></li>
-          <li><a href="#changes">Changes to This Policy</a></li>
-          <li><a href="#contact-us">Contact Us</a></li>
+          <li><a href="#information-collection" class="active">Informācijas vākšana</a></li>
+          <li><a href="#information-use">Informācijas izmantošana</a></li>
+          <li><a href="#information-sharing">Informācijas apmaiņa</a></li>
+          <li><a href="#cookies">Sīkfaili</a></li>
+          <li><a href="#your-rights">Jūsu tiesības</a></li>
+          <li><a href="#data-security">Datu drošība</a></li>
+          <li><a href="#children-privacy">Bērnu privātums</a></li>
+          <li><a href="#changes">Šīs politikas izmaiņas</a></li>
+          <li><a href="#contact-us">Sazinieties ar mums</a></li>
         </ul>
       </div>
       
@@ -361,12 +361,10 @@ require_once 'connect_db.php';
         <section id="contact-us" class="privacy-section fade-in">
           <h2>Sazinieties ar mums</h2>
           <p>Ja jums ir kādi jautājumi, bažas vai atsauksmes par šo privātuma politiku vai mūsu privātuma praksēm, lūdzu, sazinieties ar mums šeit:</p>
-          <p>E-pasts: privacy@bookswap.com</p>
-          <p>Pasta adrese: BookSwap, Inc.<br>123 Grāmatu iela<br>Reading, CA 94000<br>Amerikas Savienotās Valstis</p>
+          <p>E-pasts: bookswap@gmail.com</p>
+          <p>Grāmatu iela 5<br>Rīga<br>Latvijas Republika</p>
         </section>
-        <div class="privacy-last-updated">
-          <p>Pēdējo reizi atjaunināts: 2025. gada 9. aprīlī</p>
-        </div>
+        
       </div>
       
       <div class="privacy-action">

@@ -114,6 +114,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 $stmt_reject->close();
             } else {$response['message'] = 'DB kļūda (noraidīt).';}
             break;
+            case 'update_report_status':
+            if (!$can_moderate) { $response['message'] = 'Jums nav tiesību mainīt ziņojuma statusu.'; break; }
+            $report_id_ajax = isset($_POST['report_id']) ? intval($_POST['report_id']) : 0;
+            $new_status_ajax = isset($_POST['new_status']) ? trim($_POST['new_status']) : '';
+            
+            // Валидация нового статуса (пример)
+            $allowed_statuses = ['Apstrādāts', 'Izmeklēšanā', 'Atrisināts', 'Slēgts', 'Dzēsts'];
+            if ($report_id_ajax <= 0 || empty($new_status_ajax) || !in_array($new_status_ajax, $allowed_statuses)) {
+                $response['message'] = 'Nederīgi dati statusa maiņai.';
+                break;
+            }
+
+            if ($new_status_ajax === 'Dzēsts') { // Если "Dzēsts", то удаляем запись
+                 $stmt_update_rep = $savienojums->prepare("DELETE FROM bookswap_issue_reports WHERE report_id = ?");
+                 if($stmt_update_rep){
+                    $stmt_update_rep->bind_param("i", $report_id_ajax);
+                    if ($stmt_update_rep->execute() && $stmt_update_rep->affected_rows > 0) {
+                        $response = ['success' => true, 'message' => 'Ziņojums dzēsts.'];
+                    } else { $response['message'] = 'Neizdevās dzēst ziņojumu.'; }
+                    $stmt_update_rep->close();
+                } else {$response['message'] = 'DB kļūda (dzēst ziņojumu).';}
+            } else { // Иначе обновляем статус
+                $stmt_update_rep = $savienojums->prepare("UPDATE bookswap_issue_reports SET status = ? WHERE report_id = ?");
+                if($stmt_update_rep){
+                    $stmt_update_rep->bind_param("si", $new_status_ajax, $report_id_ajax);
+                    if ($stmt_update_rep->execute() && $stmt_update_rep->affected_rows > 0) {
+                        $response = ['success' => true, 'message' => 'Ziņojuma statuss atjaunināts.'];
+                    } else { $response['message'] = 'Neizdevās atjaunināt ziņojuma statusu.'; }
+                    $stmt_update_rep->close();
+                } else {$response['message'] = 'DB kļūda (atj. ziņ. statusu).';}
+            }
+            break;
     }
     if ($savienojums) $savienojums->close();
     echo json_encode($response);
@@ -272,6 +304,35 @@ if (isset($_SESSION['success_message'])) {
     unset($_SESSION['success_message']);
 }
 
+$userRole = $_SESSION['user_role'] ?? 'Registrēts'; // Убедитесь, что это есть
+$reported_issues = [];
+
+if ($userRole === 'Moderators' || $userRole === 'Administrators') {
+    // Переоткрываем соединение, если оно было закрыто AJAX обработчиком
+    if (!$savienojums || $savienojums->connect_errno) {
+        require 'connect_db.php';
+    }
+
+    $stmt_issues = $savienojums->prepare("
+        SELECT ir.*, u.Lietotajvards AS ReporterName 
+        FROM bookswap_issue_reports ir
+        LEFT JOIN bookswap_users u ON ir.reporter_user_id = u.LietotajsID
+        WHERE ir.status = 'Jauns' -- Показываем только новые/необработанные отчеты
+        ORDER BY ir.report_date DESC
+    ");
+
+    if ($stmt_issues) {
+        $stmt_issues->execute();
+        $result_issues = $stmt_issues->get_result();
+        while ($issue = $result_issues->fetch_assoc()) {
+            $reported_issues[] = $issue;
+        }
+        $stmt_issues->close();
+    } else {
+        $errors[] = "Kļūda ielādējot ziņojumus par problēmām: " . $savienojums->error;
+    }
+}
+
 $displayBooks = [];
 if ($userRole === 'Moderators' || $userRole === 'Administrators') {
     $stmt_mod_q = $savienojums->prepare("
@@ -356,6 +417,46 @@ if ($savienojums) $savienojums->close();
     .modal-content input[type="text"] { width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid var(--color-paper); border-radius: var(--radius-md); }
     .modal-footer-buttons { display: flex; justify-content: flex-end; gap: 10px; }
     #confirmDeleteBookBtnModal:disabled, #confirmRejectBookBtnModal:disabled { background-color: #ccc; cursor: not-allowed; }
+    .issue-reports-section {
+    margin-top: 20px;
+}
+.issue-reports-list {
+    display: grid;
+    grid-template-columns: 1fr; /* Или repeat(auto-fill, minmax(300px, 1fr)); для нескольких колонок */
+    gap: 20px;
+}
+.issue-report-card {
+    background-color: var(--color-white);
+    border: 1px solid var(--color-paper);
+    border-left: 5px solid var(--color-burgundy); /* Акцент для отчетов */
+    border-radius: var(--radius-md);
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+.issue-report-card h4 {
+    font-family: var(--font-serif);
+    color: var(--color-darkwood);
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+.issue-report-card p {
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.issue-report-card p strong {
+    font-weight: 500;
+    color: var(--color-darkwood);
+}
+.issue-report-card .status-badge {
+    background-color: var(--color-leather); /* Пример цвета для статуса "Jauns" */
+    color: white;
+    font-size: 0.75rem;
+}
+/* Добавьте стили для других статусов отчетов, если они появятся */
+.issue-report-card .status-badge.apstradats {
+    background-color: #66bb6a; /* Зеленый для обработанных */
+}
   </style>
 </head>
 <body data-current-user-id="<?php echo isLoggedIn() ? htmlspecialchars($_SESSION['user_id']) : '0'; ?>">
@@ -551,6 +652,41 @@ if ($savienojums) $savienojums->close();
                         </div>
                     <?php endif; ?>
                 </div>
+                <?php if ($userRole === 'Moderators' || $userRole === 'Administrators'): ?>
+    <div class="form-section-title"><h3>Ziņojumi par problēmām (Jauni)</h3></div>
+    <div class="moderation-section issue-reports-section">
+        <?php if (empty($reported_issues)): ?>
+            <p class="no-books-message">Nav jaunu ziņojumu par problēmām.</p>
+        <?php else: ?>
+            <div class="issue-reports-list">
+                <?php foreach ($reported_issues as $report): ?>
+                    <div class="issue-report-card" id="issue-report-<?php echo $report['report_id']; ?>">
+                        <h4>Problēmas veids: <?php echo htmlspecialchars($report['issue_type']); ?></h4>
+                        <p><strong>Ziņotājs:</strong> <?php echo htmlspecialchars($report['ReporterName'] ?? 'Anonīms'); ?> (ID: <?php echo htmlspecialchars($report['reporter_user_id']); ?>)</p>
+                        <p><strong>Datums:</strong> <?php echo htmlspecialchars(date('d.m.Y H:i', strtotime($report['issue_date']))); ?></p>
+                        <p><strong>Ziņots:</strong> <?php echo htmlspecialchars(date('d.m.Y H:i', strtotime($report['report_date']))); ?></p>
+                        
+                        <?php if (!empty($report['related_user_text'])): ?>
+                            <p><strong>Saistītais lietotājs:</strong> <?php echo htmlspecialchars($report['related_user_text']); ?></p>
+                        <?php endif; ?>
+                        <?php if (!empty($report['related_book_text'])): ?>
+                            <p><strong>Saistītā grāmata:</strong> <?php echo htmlspecialchars($report['related_book_text']); ?></p>
+                        <?php endif; ?>
+                        
+                        <p><strong>Apraksts:</strong><br><?php echo nl2br(htmlspecialchars($report['description'])); ?></p>
+                        <p><strong>Kontakti:</strong> <?php echo htmlspecialchars($report['contact_details']); ?></p>
+                        <p><strong>Status:</strong> <span class="status-badge"><?php echo htmlspecialchars($report['status']); ?></span></p>
+                        
+                        <div class="report-actions-footer" style="margin-top:15px; padding-top:10px; border-top:1px solid var(--color-paper); text-align:right;">
+                            <button class="btn btn-small-action btn-outline" onclick="markReportAs('apstrādāts', <?php echo $report['report_id']; ?>)">Atzīmēt kā apstrādātu</button>
+                            <button class="btn btn-small-action btn-reject-book" style="background-color: var(--color-burgundy);" onclick="markReportAs('dzēsts', <?php echo $report['report_id']; ?>)">Dzēst ziņojumu</button>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
             <?php else: ?>
                 <div class="form-section-title"><h3>Mana bibliotēka</h3></div>
                 <button type="button" id="addBookBtn" class="btn-outline">Pievienot grāmatu</button>
@@ -906,6 +1042,61 @@ if ($savienojums) $savienojums->close();
             setTimeout(() => { toastDiv.remove(); }, 5000);
         }
     });
+    window.markReportAs = function(newStatus, reportId) {
+    if (!confirm(`Vai tiešām vēlaties mainīt šī ziņojuma statusu uz "${newStatus}"?`)) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('ajax_action', 'update_report_status'); // Нужен новый AJAX action
+    formData.append('report_id', reportId);
+    formData.append('new_status', newStatus);
+
+    fetch('profile.php', { // Отправляем на тот же profile.php
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showUIMessage(data.message, 'success');
+            const reportCard = document.getElementById(`issue-report-${reportId}`);
+            if (reportCard) {
+                if (newStatus === 'dzēsts') { // Если статус "dzēsts", удаляем карточку
+                    reportCard.remove();
+                     // Проверка, не пуст ли список после удаления
+                    const reportList = document.querySelector('.issue-reports-list');
+                    if (reportList && reportList.children.length === 0) {
+                        const noReportsMsg = document.querySelector('.issue-reports-section .no-books-message');
+                        if(noReportsMsg) noReportsMsg.style.display = 'block';
+                        else {
+                             const p = document.createElement('p');
+                             p.className = 'no-books-message';
+                             p.textContent = 'Nav jaunu ziņojumu par problēmām.';
+                             document.querySelector('.issue-reports-section').appendChild(p);
+                        }
+                    }
+                } else {
+                    const statusBadge = reportCard.querySelector('.status-badge');
+                    if (statusBadge) {
+                        statusBadge.textContent = newStatus;
+                        statusBadge.className = `status-badge ${newStatus.toLowerCase().replace(' ', '-')}`;
+                    }
+                    // Можно скрыть кнопки после обработки, если нужно
+                    const actionsFooter = reportCard.querySelector('.report-actions-footer');
+                    if(actionsFooter) actionsFooter.innerHTML = '<p><em>Statuss atjaunināts.</em></p>';
+                }
+            }
+        } else {
+            showUIMessage(data.message || 'Kļūda atjauninot ziņojuma statusu.', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error updating report status:', error);
+        showUIMessage('Tīkla kļūda, mēģiniet vēlāk.', 'error');
+    });
+}
+
   </script>
 
  <!-- Chat Widget Start -->
@@ -955,3 +1146,4 @@ if ($savienojums) $savienojums->close();
 
 </body>
 </html>
+

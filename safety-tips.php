@@ -85,8 +85,8 @@ require_once 'connect_db.php';
   <main>
     <section class="page-header">
       <div class="container">
-        <h1>Safety Tips</h1>
-        <p>Stay safe when using BookSwap with these important guidelines</p>
+        <h1>Drošības padomi</h1>
+        <p>Lai, izmantojot BookSwap, būtu droši, ievērojiet šīs svarīgās vadlīnijas.</p>
       </div>
     </section>
 

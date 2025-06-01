@@ -385,7 +385,7 @@ require_once 'connect_db.php';
           
           <div class="gdpr-card">
             <h3>Sazinieties ar mums tieši</h3>
-            <p>Nosūtiet e-pastu mūsu Datu aizsardzības speciālistam uz dpo@bookswap.com vai izmantojiet mūsu <a href="contact-us.php">kontaktu formu</a>.</p>
+            <p>Nosūtiet e-pastu mūsu Datu aizsardzības speciālistam uz bookswap@gmail.com vai izmantojiet mūsu <a href="contact-us.php">kontaktu formu</a>.</p>
             <a href="contact-us.php" class="gdpr-btn">Kontaktu forma</a>
           </div>
           
@@ -435,15 +435,10 @@ require_once 'connect_db.php';
           <p>Ja jums ir kādi jautājumi par šo VDAR politiku, mūsu privātuma praksi vai jūsu personiskajiem datiem, lūdzu, sazinieties ar mūsu DAS:</p>
           
           <div class="gdpr-card">
-            <h3>Sazinieties ar mūsu DAS</h3>
-            <p>E-pasts: dpo@bookswap.com</p>
-            <p>Pasta adrese:<br>
-              Datu aizsardzības speciālists<br>
-              BookSwap, Inc.<br>
-              123 Grāmatu iela<br>
-              Reading, CA 94000<br>
-              Amerikas Savienotās Valstis
-            </p>
+          <h2>Sazinieties ar mums</h2>
+          <p>Ja jums ir kādi jautājumi, bažas vai atsauksmes par šo privātuma politiku vai mūsu privātuma praksēm, lūdzu, sazinieties ar mums šeit:</p>
+          <p>E-pasts: bookswap@gmail.com</p>
+          <p>Grāmatu iela 5<br>Rīga<br>Latvijas Republika</p>
           </div>
         </section>
         

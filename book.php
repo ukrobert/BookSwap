@@ -572,26 +572,62 @@ if ($book_id && !$book_not_found_error) {
         }
         
         if(sendTradeRequestBtnEl && tradeModalEl && tradeSelectEl && bookDetails) {
-            sendTradeRequestBtnEl.addEventListener('click', function() {
-                const selectedBookId = tradeSelectEl.value;
-                const messageContent = tradeMessageEl ? tradeMessageEl.value : '';
-                if (!selectedBookId) {
-                    showToast('Lūdzu, izvēlieties grāmatu, ko piedāvāt maiņai.', 'error'); return;
-                }
-                // TODO: AJAX call to send trade request
-                console.log("Sending trade request:", {
-                    offered_book_id: selectedBookId,
-                    requested_book_id: bookDetails.id,
-                    message: messageContent,
-                    receiver_id: bookDetails.userId // ID of the book owner
-                });
+    sendTradeRequestBtnEl.addEventListener('click', function() {
+        if (!currentLoggedInUserId) {
+            showToast('Lūdzu, pieslēdzieties, lai nosūtītu maiņas pieprasījumu.', 'error');
+            return;
+        }
+
+        const offeredBookId = tradeSelectEl.value;
+        const requestedBookId = bookDetails.id;
+        const exchangeMessage = tradeMessageEl ? tradeMessageEl.value.trim() : '';
+        const receiverId = bookDetails.userId; // The owner of the requested book
+
+        if (!offeredBookId) {
+            showToast('Lūdzu, izvēlieties grāmatu, ko piedāvāt maiņai.', 'error');
+            return;
+        }
+        if (currentLoggedInUserId == receiverId) {
+            showToast('Jūs nevarat pieprasīt apmaiņu pats ar sevi.', 'error');
+            return;
+        }
+
+        sendTradeRequestBtnEl.disabled = true;
+        sendTradeRequestBtnEl.textContent = 'Sūta...';
+
+        const formData = new FormData();
+        formData.append('ajax_action', 'create_exchange_request');
+        formData.append('offered_book_id', offeredBookId);
+        formData.append('requested_book_id', requestedBookId);
+        formData.append('receiver_id', receiverId);
+        formData.append('exchange_message', exchangeMessage);
+
+        fetch('profile.php', { // Отправляем запрос на profile.php
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message || 'Maiņas pieprasījums veiksmīgi nosūtīts!', 'success');
                 tradeModalEl.classList.remove('active');
                 document.body.style.overflow = 'auto';
                 tradeSelectEl.value = '';
                 if(tradeMessageEl) tradeMessageEl.value = '';
-                showToast(`Maiņas pieprasījums par "${bookDetails.title}" nosūtīts ${bookDetails.listedBy}`);
-            });
-        }
+            } else {
+                showToast(data.message || 'Kļūda nosūtot maiņas pieprasījumu.', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error creating exchange request:', error);
+            showToast('Tīkla kļūda, mēģiniet vēlāk.', 'error');
+        })
+        .finally(() => {
+            sendTradeRequestBtnEl.disabled = false;
+            sendTradeRequestBtnEl.textContent = 'Nosūtīt apmaiņas pieprasījumu';
+        });
+    });
+}
         
         if(toastCloseBtn && toastEl) {
             toastCloseBtn.addEventListener('click', hideToast);
