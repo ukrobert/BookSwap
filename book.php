@@ -572,62 +572,59 @@ if ($book_id && !$book_not_found_error) {
         }
         
         if(sendTradeRequestBtnEl && tradeModalEl && tradeSelectEl && bookDetails) {
-    sendTradeRequestBtnEl.addEventListener('click', function() {
-        if (!currentLoggedInUserId) {
-            showToast('Lūdzu, pieslēdzieties, lai nosūtītu maiņas pieprasījumu.', 'error');
-            return;
+            sendTradeRequestBtnEl.addEventListener('click', function() {
+                const offeredBookId = tradeSelectEl.value;
+                const requestedBookId = bookDetails.id; // ID книги, которую просматривают
+                const messageText = tradeMessageEl ? tradeMessageEl.value.trim() : '';
+                const bookOwnerId = bookDetails.userId; // ID владельца книги, которой интересуются
+
+                if (!offeredBookId) {
+                    showToast('Lūdzu, izvēlieties grāmatu, ko piedāvāt maiņai.', 'error'); return;
+                }
+                if (!currentLoggedInUserId) { // currentLoggedInUserId должен быть определен глобально на странице
+                    showToast('Lūdzu, pieslēdzieties, lai nosūtītu pieprasījumu.', 'error'); return;
+                }
+                if (currentLoggedInUserId === bookOwnerId) {
+                    showToast('Jūs nevarat pieprasīt apmaiņu pats ar sevi.', 'error'); return;
+                }
+
+
+                sendTradeRequestBtnEl.disabled = true;
+                sendTradeRequestBtnEl.textContent = 'Sūta...';
+
+                const formData = new FormData();
+                formData.append('ajax_action', 'create_exchange_request');
+                formData.append('offered_book_id', offeredBookId);
+                formData.append('requested_book_id', requestedBookId);
+                formData.append('book_owner_id', bookOwnerId); // Передаем ID владельца запрашиваемой книги
+                formData.append('message_text', messageText);
+
+                fetch('profile.php', { // Отправляем на profile.php, так как там будет AJAX обработчик
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast(data.message || 'Maiņas pieprasījums nosūtīts!', 'success');
+                        tradeModalEl.classList.remove('active');
+                        document.body.style.overflow = 'auto';
+                        tradeSelectEl.value = '';
+                        if(tradeMessageEl) tradeMessageEl.value = '';
+                    } else {
+                        showToast(data.message || 'Kļūda nosūtot pieprasījumu.', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error sending trade request:', error);
+                    showToast('Tīkla kļūda, mēģiniet vēlāk.', 'error');
+                })
+                .finally(() => {
+                    sendTradeRequestBtnEl.disabled = false;
+                    sendTradeRequestBtnEl.textContent = 'Nosūtīt apmaiņas pieprasījumu';
+                });
+            });
         }
-
-        const offeredBookId = tradeSelectEl.value;
-        const requestedBookId = bookDetails.id;
-        const exchangeMessage = tradeMessageEl ? tradeMessageEl.value.trim() : '';
-        const receiverId = bookDetails.userId; // The owner of the requested book
-
-        if (!offeredBookId) {
-            showToast('Lūdzu, izvēlieties grāmatu, ko piedāvāt maiņai.', 'error');
-            return;
-        }
-        if (currentLoggedInUserId == receiverId) {
-            showToast('Jūs nevarat pieprasīt apmaiņu pats ar sevi.', 'error');
-            return;
-        }
-
-        sendTradeRequestBtnEl.disabled = true;
-        sendTradeRequestBtnEl.textContent = 'Sūta...';
-
-        const formData = new FormData();
-        formData.append('ajax_action', 'create_exchange_request');
-        formData.append('offered_book_id', offeredBookId);
-        formData.append('requested_book_id', requestedBookId);
-        formData.append('receiver_id', receiverId);
-        formData.append('exchange_message', exchangeMessage);
-
-        fetch('profile.php', { // Отправляем запрос на profile.php
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast(data.message || 'Maiņas pieprasījums veiksmīgi nosūtīts!', 'success');
-                tradeModalEl.classList.remove('active');
-                document.body.style.overflow = 'auto';
-                tradeSelectEl.value = '';
-                if(tradeMessageEl) tradeMessageEl.value = '';
-            } else {
-                showToast(data.message || 'Kļūda nosūtot maiņas pieprasījumu.', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error creating exchange request:', error);
-            showToast('Tīkla kļūda, mēģiniet vēlāk.', 'error');
-        })
-        .finally(() => {
-            sendTradeRequestBtnEl.disabled = false;
-            sendTradeRequestBtnEl.textContent = 'Nosūtīt apmaiņas pieprasījumu';
-        });
-    });
-}
         
         if(toastCloseBtn && toastEl) {
             toastCloseBtn.addEventListener('click', hideToast);
@@ -654,6 +651,8 @@ if ($book_id && !$book_not_found_error) {
             mobileMenuButton.addEventListener('click', () => mobileMenu.classList.toggle('active'));
         }
     });
+
+    
     </script>
     
     <!-- Chat Widget HTML and JS (as provided in the previous step) -->

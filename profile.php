@@ -25,34 +25,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
     if (!$savienojums) { $response['message'] = 'DB savienojuma kļūda.'; echo json_encode($response); exit; }
 
     $book_id_ajax = isset($_POST['book_id']) ? intval($_POST['book_id']) : 0;
-    if ($book_id_ajax <= 0) { $response['message'] = 'Nederīgs grāmatas ID.'; echo json_encode($response); exit;}
-
+    
     $can_moderate = ($userRole === 'Moderators' || $userRole === 'Administrators');
     $is_owner = false;
     $book_owner_id = null;
     $book_current_status_for_restore_logic = null;
 
-    $checkStmt = $savienojums->prepare("SELECT LietotajsID, Status FROM bookswap_books WHERE GramatasID = ?");
-    if($checkStmt) {
-        $checkStmt->bind_param("i", $book_id_ajax);
-        $checkStmt->execute();
-        $checkResult = $checkStmt->get_result();
-        if ($bookRow = $checkResult->fetch_assoc()) {
-            $book_owner_id = $bookRow['LietotajsID'];
-            $book_current_status_for_restore_logic = $bookRow['Status'];
-            if ($book_owner_id == $userId) {
-                $is_owner = true;
+    if ($book_id_ajax > 0) { // Only check owner if book_id is relevant
+        $checkStmt = $savienojums->prepare("SELECT LietotajsID, Status FROM bookswap_books WHERE GramatasID = ?");
+        if($checkStmt) {
+            $checkStmt->bind_param("i", $book_id_ajax);
+            $checkStmt->execute();
+            $checkResult = $checkStmt->get_result();
+            if ($bookRow = $checkResult->fetch_assoc()) {
+                $book_owner_id = $bookRow['LietotajsID'];
+                $book_current_status_for_restore_logic = $bookRow['Status'];
+                if ($book_owner_id == $userId) {
+                    $is_owner = true;
+                }
+            } else {
+                if ($_POST['ajax_action'] !== 'create_exchange_request' && $_POST['ajax_action'] !== 'handle_exchange_request' && $_POST['ajax_action'] !== 'update_report_status') {
+                     $response['message'] = 'Grāmata nav atrasta.'; echo json_encode($response); $checkStmt->close(); exit;
+                }
             }
+            $checkStmt->close();
         } else {
-            $response['message'] = 'Grāmata nav atrasta.'; echo json_encode($response); $checkStmt->close(); exit;
+            $response['message'] = 'DB kļūda (pārbaude).'; echo json_encode($response); exit;
         }
-        $checkStmt->close();
-    } else {
-        $response['message'] = 'DB kļūda (pārbaude).'; echo json_encode($response); exit;
     }
+
 
     switch ($_POST['ajax_action']) {
         case 'schedule_delete_book':
+            if ($book_id_ajax <= 0) { $response['message'] = 'Nederīgs grāmatas ID.'; break; }
             if (!$is_owner) { $response['message'] = 'Jums nav tiesību dzēst šo grāmatu.'; break; }
             $delete_until = date('Y-m-d H:i:s', time() + (5 * 60));
             $stmt = $savienojums->prepare("UPDATE bookswap_books SET Status = 'Gaida dzēšanu', GaidaDzesanuLidz = ? WHERE GramatasID = ? AND LietotajsID = ? AND (Status = 'Pieejama' OR Status = 'Gaida apstiprinājumu')");
@@ -64,13 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 $stmt->close();
             } else {$response['message'] = 'DB kļūda (plānot dzēšanu).';}
             break;
-
         case 'restore_book':
+            if ($book_id_ajax <= 0) { $response['message'] = 'Nederīgs grāmatas ID.'; break; }
             if (!$is_owner) { $response['message'] = 'Jums nav tiesību atjaunot šo grāmatu.'; break; }
-            
-            $status_to_restore = 'Pieejama'; 
             $status_to_restore_for_owner = 'Gaida apstiprinājumu';
-
             $stmt = $savienojums->prepare("UPDATE bookswap_books SET Status = ?, GaidaDzesanuLidz = NULL WHERE GramatasID = ? AND LietotajsID = ? AND Status = 'Gaida dzēšanu'");
             if($stmt){
                 $stmt->bind_param("sii", $status_to_restore_for_owner, $book_id_ajax, $userId);
@@ -81,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             } else {$response['message'] = 'DB kļūda (atjaunot).';}
             break;
         case 'approve_book':
+            if ($book_id_ajax <= 0) { $response['message'] = 'Nederīgs grāmatas ID.'; break; }
             if (!$can_moderate) { $response['message'] = 'Jums nav tiesību apstiprināt grāmatas.'; break; }
             $stmt_approve = $savienojums->prepare("UPDATE bookswap_books SET Status = 'Pieejama' WHERE GramatasID = ? AND Status = 'Gaida apstiprinājumu'");
             if($stmt_approve){
@@ -92,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             } else {$response['message'] = 'DB kļūda (apstiprināt).';}
             break;
         case 'reject_book': 
+            if ($book_id_ajax <= 0) { $response['message'] = 'Nederīgs grāmatas ID.'; break; }
             if (!$can_moderate) { $response['message'] = 'Jums nav tiesību noraidīt grāmatas.'; break; }
             $image_path_reject = null;
             $stmt_get_img_reject = $savienojums->prepare("SELECT Attels FROM bookswap_books WHERE GramatasID = ?");
@@ -114,45 +118,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 $stmt_reject->close();
             } else {$response['message'] = 'DB kļūda (noraidīt).';}
             break;
-            case 'update_report_status':
+        case 'update_report_status':
             if (!$can_moderate) { $response['message'] = 'Jums nav tiesību mainīt ziņojuma statusu.'; break; }
             $report_id_ajax = isset($_POST['report_id']) ? intval($_POST['report_id']) : 0;
             $new_status_ajax = isset($_POST['new_status']) ? trim($_POST['new_status']) : '';
-            
-            // Валидация нового статуса (пример)
             $allowed_statuses = ['Apstrādāts', 'Izmeklēšanā', 'Atrisināts', 'Slēgts', 'Dzēsts'];
             if ($report_id_ajax <= 0 || empty($new_status_ajax) || !in_array($new_status_ajax, $allowed_statuses)) {
-                $response['message'] = 'Nederīgi dati statusa maiņai.';
-                break;
+                $response['message'] = 'Nederīgi dati statusa maiņai.'; break;
             }
-
-            if ($new_status_ajax === 'Dzēsts') { // Если "Dzēsts", то удаляем запись
+            if ($new_status_ajax === 'Dzēsts') {
                  $stmt_update_rep = $savienojums->prepare("DELETE FROM bookswap_issue_reports WHERE report_id = ?");
                  if($stmt_update_rep){
                     $stmt_update_rep->bind_param("i", $report_id_ajax);
-                    if ($stmt_update_rep->execute() && $stmt_update_rep->affected_rows > 0) {
-                        $response = ['success' => true, 'message' => 'Ziņojums dzēsts.'];
-                    } else { $response['message'] = 'Neizdevās dzēst ziņojumu.'; }
+                    if ($stmt_update_rep->execute() && $stmt_update_rep->affected_rows > 0) { $response = ['success' => true, 'message' => 'Ziņojums dzēsts.']; } 
+                    else { $response['message'] = 'Neizdevās dzēst ziņojumu.'; }
                     $stmt_update_rep->close();
                 } else {$response['message'] = 'DB kļūda (dzēst ziņojumu).';}
-            } else { // Иначе обновляем статус
+            } else { 
                 $stmt_update_rep = $savienojums->prepare("UPDATE bookswap_issue_reports SET status = ? WHERE report_id = ?");
                 if($stmt_update_rep){
                     $stmt_update_rep->bind_param("si", $new_status_ajax, $report_id_ajax);
-                    if ($stmt_update_rep->execute() && $stmt_update_rep->affected_rows > 0) {
-                        $response = ['success' => true, 'message' => 'Ziņojuma statuss atjaunināts.'];
-                    } else { $response['message'] = 'Neizdevās atjaunināt ziņojuma statusu.'; }
+                    if ($stmt_update_rep->execute() && $stmt_update_rep->affected_rows > 0) { $response = ['success' => true, 'message' => 'Ziņojuma statuss atjaunināts.'];} 
+                    else { $response['message'] = 'Neizdevās atjaunināt ziņojuma statusu.'; }
                     $stmt_update_rep->close();
                 } else {$response['message'] = 'DB kļūda (atj. ziņ. statusu).';}
             }
             break;
+        case 'create_exchange_request':
+            if (!isLoggedIn()) { $response['message'] = 'Lūdzu, pieslēdzieties.'; break;}
+            $offered_book_id = isset($_POST['offered_book_id']) ? intval($_POST['offered_book_id']) : 0;
+            $requested_book_id = isset($_POST['requested_book_id']) ? intval($_POST['requested_book_id']) : 0;
+            $book_owner_id_req = isset($_POST['book_owner_id']) ? intval($_POST['book_owner_id']) : 0;
+            $message_text = isset($_POST['message_text']) ? trim($_POST['message_text']) : '';
+            $initiator_id = $_SESSION['user_id'];
+
+            if ($offered_book_id <= 0 || $requested_book_id <= 0 || $book_owner_id_req <= 0) { $response['message'] = 'Nederīgi grāmatas dati.'; break; }
+            if ($initiator_id == $book_owner_id_req) { $response['message'] = 'Jūs nevarat pieprasīt apmaiņu pats ar sevi.'; break; }
+            
+            $stmt_create_req = $savienojums->prepare("INSERT INTO bookswap_exchange_requests (IniciatorsID, AdresatsID, PiedavatGramataID, VelamaiGramataID, Status, IzveidotsDatums, ApmaijnasTekets) VALUES (?, ?, ?, ?, 'Gaida', NOW(), ?)");
+            if ($stmt_create_req) {
+                $stmt_create_req->bind_param("iiiis", $initiator_id, $book_owner_id_req, $offered_book_id, $requested_book_id, $message_text);
+                if ($stmt_create_req->execute()) { $response = ['success' => true, 'message' => 'Maiņas pieprasījums nosūtīts!']; } 
+                else { $response['message'] = 'Kļūda veidojot maiņas pieprasījumu: ' . $stmt_create_req->error; }
+                $stmt_create_req->close();
+            } else { $response['message'] = 'DB kļūda (izveidot pieprasījumu).'; }
+            break;
+        case 'handle_exchange_request':
+            if (!isLoggedIn()) { $response['message'] = 'Lūdzu, pieslēdzieties.'; break;}
+            $request_id = isset($_POST['request_id']) ? intval($_POST['request_id']) : 0;
+            $decision = isset($_POST['decision']) ? $_POST['decision'] : '';
+            $adresats_id_handle = $_SESSION['user_id'];
+
+            if ($request_id <= 0 || !in_array($decision, ['approve', 'reject'])) { $response['message'] = 'Nederīgi dati.'; break; }
+            
+            $stmt_get_req = $savienojums->prepare("SELECT IniciatorsID, PiedavatGramataID, VelamaiGramataID FROM bookswap_exchange_requests WHERE PieprasijumaID = ? AND AdresatsID = ? AND Status = 'Gaida'");
+            if ($stmt_get_req) {
+                $stmt_get_req->bind_param("ii", $request_id, $adresats_id_handle);
+                $stmt_get_req->execute();
+                $result_req = $stmt_get_req->get_result();
+                if ($request_data = $result_req->fetch_assoc()) {
+                    $new_status_req = ($decision === 'approve') ? 'Apstiprināts' : 'Noraidīts';
+                    $savienojums->begin_transaction();
+                    try {
+                        $stmt_update_req = $savienojums->prepare("UPDATE bookswap_exchange_requests SET Status = ? WHERE PieprasijumaID = ?");
+                        $stmt_update_req->bind_param("si", $new_status_req, $request_id); $stmt_update_req->execute(); $stmt_update_req->close();
+                        if ($decision === 'approve') {
+                            $stmt_update_book1 = $savienojums->prepare("UPDATE bookswap_books SET Status = 'Apmainīta' WHERE GramatasID = ?");
+                            $stmt_update_book1->bind_param("i", $request_data['PiedavatGramataID']); $stmt_update_book1->execute(); $stmt_update_book1->close();
+                            $stmt_update_book2 = $savienojums->prepare("UPDATE bookswap_books SET Status = 'Apmainīta' WHERE GramatasID = ?");
+                            $stmt_update_book2->bind_param("i", $request_data['VelamaiGramataID']); $stmt_update_book2->execute(); $stmt_update_book2->close();
+                        }
+                        $savienojums->commit();
+                        $response = ['success' => true, 'message' => 'Pieprasījums ' . ($decision === 'approve' ? 'apstiprināts' : 'noraidīts') . '.'];
+                        if ($decision === 'approve') {
+                             $response['initiator_id'] = $request_data['IniciatorsID'];
+                             $stmt_get_initiator_name = $savienojums->prepare("SELECT Lietotajvards FROM bookswap_users WHERE LietotajsID = ?");
+                             if($stmt_get_initiator_name){
+                                $stmt_get_initiator_name->bind_param("i", $request_data['IniciatorsID']); $stmt_get_initiator_name->execute();
+                                $res_name = $stmt_get_initiator_name->get_result();
+                                if($name_row = $res_name->fetch_assoc()){ $response['initiator_name'] = $name_row['Lietotajvards']; }
+                                $stmt_get_initiator_name->close();
+                             }
+                        }
+                    } catch (Exception $e) { $savienojums->rollback(); $response['message'] = 'Kļūda apstrādājot pieprasījumu: ' . $e->getMessage(); }
+                } else { $response['message'] = 'Pieprasījums nav atrasts, nav adresēts jums, vai jau apstrādāts.'; }
+                $stmt_get_req->close();
+            } else { $response['message'] = 'DB kļūda (saņemt pieprasījumu).'; }
+            break;
     }
-    if ($savienojums) $savienojums->close();
+    if ($savienojums && mysqli_ping($savienojums)) $savienojums->close(); // Проверяем перед закрытием
     echo json_encode($response);
     exit;
 }
 
-if ($savienojums) {
+if ($savienojums && mysqli_ping($savienojums)) {
     $autoDeleteStmt = $savienojums->prepare("UPDATE bookswap_books SET Status = 'Dzēsta', GaidaDzesanuLidz = NULL WHERE Status = 'Gaida dzēšanu' AND GaidaDzesanuLidz IS NOT NULL AND GaidaDzesanuLidz <= NOW() AND LietotajsID = ?");
     if ($autoDeleteStmt) {
         $autoDeleteStmt->bind_param("i", $userId);
@@ -163,8 +222,7 @@ if ($savienojums) {
 
 $stmt_user_refresh = $savienojums->prepare("SELECT Lietotajvards, E_pasts, ProfilaAttels, Loma FROM bookswap_users WHERE LietotajsID = ?");
 if ($stmt_user_refresh) {
-    $stmt_user_refresh->bind_param("i", $userId);
-    $stmt_user_refresh->execute();
+    $stmt_user_refresh->bind_param("i", $userId); $stmt_user_refresh->execute();
     $result_user_refresh = $stmt_user_refresh->get_result();
     if ($user_db_data_refresh = $result_user_refresh->fetch_assoc()) {
         $_SESSION['user_name'] = $user_db_data_refresh['Lietotajvards']; $userName = $user_db_data_refresh['Lietotajvards'];
@@ -182,70 +240,53 @@ $lastName = isset($nameParts[1]) ? $nameParts[1] : '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['ajax_action'])) {
     if (isset($_POST['action'])) {
         if ($_POST['action'] === 'add_book') {
-            $bookTitle = trim($_POST['bookTitleP'] ?? '');
-            $bookAuthor = trim($_POST['bookAuthorP'] ?? '');
-            $bookGenre = trim($_POST['bookGenreP'] ?? ''); 
-            $bookLanguage = trim($_POST['bookLanguageP'] ?? '');
-            $bookYear = intval($_POST['bookYearP'] ?? 0);
-            $bookStavoklis = trim($_POST['bookConditionP'] ?? 'Laba'); 
+            $bookTitle = trim($_POST['bookTitleP'] ?? ''); $bookAuthor = trim($_POST['bookAuthorP'] ?? '');
+            $bookGenre = trim($_POST['bookGenreP'] ?? ''); $bookLanguage = trim($_POST['bookLanguageP'] ?? '');
+            $bookYear = intval($_POST['bookYearP'] ?? 0); $bookStavoklis = trim($_POST['bookConditionP'] ?? 'Laba'); 
             $bookDescription = trim($_POST['bookDescriptionP'] ?? '');
-            
-            if (empty($bookTitle)) $errors[] = 'Nosaukums ir obligāts.';
-            if (empty($bookAuthor)) $errors[] = 'Autors ir obligāts.';
+            if (empty($bookTitle)) $errors[] = 'Nosaukums ir obligāts.'; if (empty($bookAuthor)) $errors[] = 'Autors ir obligāts.';
             if (empty($bookGenre) || !in_array($bookGenre, $genres_list)) $errors[] = 'Lūdzu, izvēlieties derīgu žanru.';
             if (empty($bookLanguage)) $errors[] = 'Valoda ir obligāta.';
             if ($bookYear < 1000 || $bookYear > date("Y")) $errors[] = 'Nederīgs izdošanas gads.';
             if (empty($bookStavoklis) || !in_array($bookStavoklis, $conditions_list)) $errors[] = 'Lūdzu, izvēlieties derīgu stāvokli.';
-
             $bookImage = '';
             if (empty($errors)) {
                 if (isset($_FILES['bookImageP']) && $_FILES['bookImageP']['error'] === UPLOAD_ERR_OK) {
-                     $file_book_img = $_FILES['bookImageP'];
-                    $allowedTypes_book_img = ['image/jpeg', 'image/png', 'image/gif'];
+                     $file_book_img = $_FILES['bookImageP']; $allowedTypes_book_img = ['image/jpeg', 'image/png', 'image/gif'];
                     if (!in_array($file_book_img['type'], $allowedTypes_book_img)) $errors[] = 'Grāmatas attēlam atbalstītie formāti: JPEG, PNG, GIF';
                     if ($file_book_img['size'] > 2 * 1024 * 1024) $errors[] = 'Grāmatas attēla izmērs nedrīkst pārsniegt 2MB';
                     if (empty($errors)) { 
-                        $uploadDir_book_img = 'uploads/book_images/';
-                        if (!is_dir($uploadDir_book_img)) mkdir($uploadDir_book_img, 0755, true);
+                        $uploadDir_book_img = 'uploads/book_images/'; if (!is_dir($uploadDir_book_img)) mkdir($uploadDir_book_img, 0755, true);
                         $fileExtension_book_img = strtolower(pathinfo($file_book_img['name'], PATHINFO_EXTENSION));
                         $fileName_book_img = 'book_' . $userId . '_' . time() . '_' . uniqid() . '.' . $fileExtension_book_img;
                         $filePath_book_img = $uploadDir_book_img . $fileName_book_img;
-                        if (move_uploaded_file($file_book_img['tmp_name'], $filePath_book_img)) {
-                            $bookImage = $filePath_book_img;
-                        } else { $errors[] = 'Kļūda augšupielādējot grāmatas attēlu.'; }
+                        if (move_uploaded_file($file_book_img['tmp_name'], $filePath_book_img)) { $bookImage = $filePath_book_img; } 
+                        else { $errors[] = 'Kļūda augšupielādējot grāmatas attēlu.'; }
                     }
                 }
                 if (empty($errors)) {
-                    $currentDate = date('Y-m-d H:i:s');
-                    $status = 'Gaida apstiprinājumu'; 
+                    $currentDate = date('Y-m-d H:i:s'); $status = 'Gaida apstiprinājumu'; 
                     $stmt_add_book = $savienojums->prepare("INSERT INTO bookswap_books (Nosaukums, Autors, Zanrs, Valoda, IzdosanasGads, Apraksts, Attels, PievienosanasDatums, Status, LietotajsID, Stavoklis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     if($stmt_add_book) {
                         $stmt_add_book->bind_param("ssssissssis", $bookTitle, $bookAuthor, $bookGenre, $bookLanguage, $bookYear, $bookDescription, $bookImage, $currentDate, $status, $userId, $bookStavoklis);
-                        if ($stmt_add_book->execute()) {
-                            $_SESSION['success_message'] = 'Grāmata pievienota un gaida apstiprinājumu!';
-                            header('Location: profile.php'); exit();
-                        } else {
-                            $errors[] = 'Kļūda pievienojot grāmatu: ' . $stmt_add_book->error;
-                            if (!empty($bookImage) && file_exists($bookImage)) unlink($bookImage);
-                        }
+                        if ($stmt_add_book->execute()) { $_SESSION['success_message'] = 'Grāmata pievienota un gaida apstiprinājumu!'; header('Location: profile.php'); exit(); } 
+                        else { $errors[] = 'Kļūda pievienojot grāmatu: ' . $stmt_add_book->error; if (!empty($bookImage) && file_exists($bookImage)) unlink($bookImage); }
                         $stmt_add_book->close();
                     } else { $errors[] = 'DB Kļūda (pievienot grāmatu).'; }
                 }
             }
         } elseif ($_POST['action'] === 'update_profile') {
-            $firstName_form = trim($_POST['firstName'] ?? '');
-            $lastName_form = trim($_POST['lastName'] ?? '');
+            $firstName_form = trim($_POST['firstName'] ?? ''); $lastName_form = trim($_POST['lastName'] ?? '');
             if (empty($firstName_form)) $errors[] = 'Vārds ir obligāts lauks';
             if (empty($errors)) {
                 $fullName = $firstName_form . (!empty($lastName_form) ? ' ' . $lastName_form : '');
                 $stmt_upd_prof = $savienojums->prepare("UPDATE bookswap_users SET Lietotajvards = ? WHERE LietotajsID = ?");
-                $stmt_upd_prof->bind_param("si", $fullName, $userId);
-                if ($stmt_upd_prof->execute()) {
-                    $_SESSION['user_name'] = $fullName;
-                    $_SESSION['success_message'] = 'Profils veiksmīgi atjaunināts!';
-                    header('Location: profile.php'); exit();
-                } else { $errors[] = 'Kļūda atjauninot profilu: ' . $savienojums->error; }
-                $stmt_upd_prof->close();
+                if($stmt_upd_prof){
+                    $stmt_upd_prof->bind_param("si", $fullName, $userId);
+                    if ($stmt_upd_prof->execute()) { $_SESSION['user_name'] = $fullName; $_SESSION['success_message'] = 'Profils veiksmīgi atjaunināts!'; header('Location: profile.php'); exit();
+                    } else { $errors[] = 'Kļūda atjauninot profilu: ' . $savienojums->error; }
+                    $stmt_upd_prof->close();
+                } else {$errors[] = 'DB Kļūda (profila atj.).';}
             }
         } elseif ($_POST['action'] === 'change_password') { 
             $currentPassword = $_POST['currentPassword'] ?? ''; $newPassword = $_POST['newPassword'] ?? ''; $confirmNewPassword = $_POST['confirmNewPassword'] ?? '';
@@ -254,18 +295,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['ajax_action'])) {
             if ($newPassword !== $confirmNewPassword) $errors[] = 'Jaunās paroles nesakrīt';
             if (empty($errors)) {
                 $stmt_pwd = $savienojums->prepare("SELECT Parole FROM bookswap_users WHERE LietotajsID = ?");
-                $stmt_pwd->bind_param("i", $userId); $stmt_pwd->execute(); $result_pwd = $stmt_pwd->get_result();
-                if ($user_pwd = $result_pwd->fetch_assoc()) {
-                    if (password_verify($currentPassword, $user_pwd['Parole'])) {
-                        $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
-                        $updateStmt_pwd = $savienojums->prepare("UPDATE bookswap_users SET Parole = ? WHERE LietotajsID = ?");
-                        $updateStmt_pwd->bind_param("si", $hashedPassword, $userId);
-                        if ($updateStmt_pwd->execute()) { $_SESSION['success_message'] = 'Parole veiksmīgi atjaunināta!'; header('Location: profile.php'); exit(); } 
-                        else { $errors[] = 'Kļūda atjauninot paroli: ' . $savienojums->error; }
-                        $updateStmt_pwd->close();
-                    } else { $errors[] = 'Pašreizējā parole ir nepareiza'; }
-                } else { $errors[] = 'Lietotājs nav atrasts'; }
-                $stmt_pwd->close();
+                if($stmt_pwd){
+                    $stmt_pwd->bind_param("i", $userId); $stmt_pwd->execute(); $result_pwd = $stmt_pwd->get_result();
+                    if ($user_pwd = $result_pwd->fetch_assoc()) {
+                        if (password_verify($currentPassword, $user_pwd['Parole'])) {
+                            $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+                            $updateStmt_pwd = $savienojums->prepare("UPDATE bookswap_users SET Parole = ? WHERE LietotajsID = ?");
+                            if($updateStmt_pwd){
+                                $updateStmt_pwd->bind_param("si", $hashedPassword, $userId);
+                                if ($updateStmt_pwd->execute()) { $_SESSION['success_message'] = 'Parole veiksmīgi atjaunināta!'; header('Location: profile.php'); exit(); } 
+                                else { $errors[] = 'Kļūda atjauninot paroli: ' . $savienojums->error; }
+                                $updateStmt_pwd->close();
+                            } else {$errors[] = 'DB Kļūda (paroles atj.).';}
+                        } else { $errors[] = 'Pašreizējā parole ir nepareiza'; }
+                    } else { $errors[] = 'Lietotājs nav atrasts'; }
+                    $stmt_pwd->close();
+                } else {$errors[] = 'DB Kļūda (paroles pārbaude).';}
             }
         } elseif ($_POST['action'] === 'upload_photo') { 
             if (isset($_FILES['profilePhoto']) && $_FILES['profilePhoto']['error'] === UPLOAD_ERR_OK) {
@@ -279,22 +324,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['ajax_action'])) {
                     if (move_uploaded_file($file['tmp_name'], $filePath)) {
                         if (!empty($profilePhoto) && file_exists($profilePhoto) && strpos($profilePhoto, 'default') === false) { unlink($profilePhoto); }
                         $stmt_photo = $savienojums->prepare("UPDATE bookswap_users SET ProfilaAttels = ? WHERE LietotajsID = ?");
-                        $stmt_photo->bind_param("si", $filePath, $userId);
-                        if ($stmt_photo->execute()) {
-                            $_SESSION['user_profile_photo'] = $filePath; $_SESSION['success_message'] = 'Profila fotoattēls veiksmīgi atjaunināts!'; header('Location: profile.php'); exit();
-                        } else { $errors[] = 'Kļūda atjauninot profila foto datubāzē.'; if(file_exists($filePath)) unlink($filePath); }
-                        $stmt_photo->close();
+                        if($stmt_photo){
+                            $stmt_photo->bind_param("si", $filePath, $userId);
+                            if ($stmt_photo->execute()) { $_SESSION['user_profile_photo'] = $filePath; $_SESSION['success_message'] = 'Profila fotoattēls veiksmīgi atjaunināts!'; header('Location: profile.php'); exit();
+                            } else { $errors[] = 'Kļūda atjauninot profila foto datubāzē.'; if(file_exists($filePath)) unlink($filePath); }
+                            $stmt_photo->close();
+                        } else {$errors[] = 'DB Kļūda (foto atj.).';}
                     } else { $errors[] = 'Kļūda augšupielādējot failu.'; }
                 }
             } else { $errors[] = 'Lūdzu, izvēlieties failu vai notika kļūda augšupielādes laikā.'; }
         } elseif ($_POST['action'] === 'remove_photo') { 
             $stmt_remove_photo = $savienojums->prepare("UPDATE bookswap_users SET ProfilaAttels = NULL WHERE LietotajsID = ?");
-            $stmt_remove_photo->bind_param("i", $userId);
-            if ($stmt_remove_photo->execute()) {
-                if (!empty($profilePhoto) && file_exists($profilePhoto) && strpos($profilePhoto, 'default') === false) { unlink($profilePhoto); }
-                $_SESSION['user_profile_photo'] = ''; $_SESSION['success_message'] = 'Profila fotoattēls veiksmīgi noņemts!'; header('Location: profile.php'); exit();
-            } else { $errors[] = 'Kļūda noņemot profila fotoattēlu.';}
-            $stmt_remove_photo->close();
+            if($stmt_remove_photo){
+                $stmt_remove_photo->bind_param("i", $userId);
+                if ($stmt_remove_photo->execute()) {
+                    if (!empty($profilePhoto) && file_exists($profilePhoto) && strpos($profilePhoto, 'default') === false) { unlink($profilePhoto); }
+                    $_SESSION['user_profile_photo'] = ''; $_SESSION['success_message'] = 'Profila fotoattēls veiksmīgi noņemts!'; header('Location: profile.php'); exit();
+                } else { $errors[] = 'Kļūda noņemot profila fotoattēlu.';}
+                $stmt_remove_photo->close();
+            } else {$errors[] = 'DB Kļūda (foto noņemšana).';}
         }
     }
 }
@@ -304,66 +352,47 @@ if (isset($_SESSION['success_message'])) {
     unset($_SESSION['success_message']);
 }
 
-$userRole = $_SESSION['user_role'] ?? 'Registrēts'; // Убедитесь, что это есть
-$reported_issues = [];
-
+$reported_issues = []; // Initialize
 if ($userRole === 'Moderators' || $userRole === 'Administrators') {
-    // Переоткрываем соединение, если оно было закрыто AJAX обработчиком
-    if (!$savienojums || $savienojums->connect_errno) {
-        require 'connect_db.php';
-    }
-
-    $stmt_issues = $savienojums->prepare("
-        SELECT ir.*, u.Lietotajvards AS ReporterName 
-        FROM bookswap_issue_reports ir
-        LEFT JOIN bookswap_users u ON ir.reporter_user_id = u.LietotajsID
-        WHERE ir.status = 'Jauns' -- Показываем только новые/необработанные отчеты
-        ORDER BY ir.report_date DESC
-    ");
-
+    if (!$savienojums || $savienojums->connect_errno) { require 'connect_db.php'; }
+    $stmt_issues = $savienojums->prepare("SELECT ir.*, u.Lietotajvards AS ReporterName FROM bookswap_issue_reports ir LEFT JOIN bookswap_users u ON ir.reporter_user_id = u.LietotajsID WHERE ir.status = 'Jauns' ORDER BY ir.report_date DESC");
     if ($stmt_issues) {
-        $stmt_issues->execute();
-        $result_issues = $stmt_issues->get_result();
-        while ($issue = $result_issues->fetch_assoc()) {
-            $reported_issues[] = $issue;
-        }
+        $stmt_issues->execute(); $result_issues = $stmt_issues->get_result();
+        while ($issue = $result_issues->fetch_assoc()) { $reported_issues[] = $issue; }
         $stmt_issues->close();
-    } else {
-        $errors[] = "Kļūda ielādējot ziņojumus par problēmām: " . $savienojums->error;
-    }
+    } else { $errors[] = "Kļūda ielādējot ziņojumus par problēmām: " . $savienojums->error; }
 }
 
 $displayBooks = [];
 if ($userRole === 'Moderators' || $userRole === 'Administrators') {
-    $stmt_mod_q = $savienojums->prepare("
-        SELECT b.*, u.Lietotajvards AS IesniedzejsVards 
-        FROM bookswap_books b
-        JOIN bookswap_users u ON b.LietotajsID = u.LietotajsID
-        WHERE b.Status = 'Gaida apstiprinājumu' 
-        ORDER BY b.PievienosanasDatums ASC
-    ");
+    if (!$savienojums || $savienojums->connect_errno) { require 'connect_db.php'; }
+    $stmt_mod_q = $savienojums->prepare("SELECT b.*, u.Lietotajvards AS IesniedzejsVards FROM bookswap_books b JOIN bookswap_users u ON b.LietotajsID = u.LietotajsID WHERE b.Status = 'Gaida apstiprinājumu' ORDER BY b.PievienosanasDatums ASC");
     if ($stmt_mod_q) {
-        $stmt_mod_q->execute();
-        $result_mod_q = $stmt_mod_q->get_result();
-        while ($book_item_mod = $result_mod_q->fetch_assoc()) {
-            $displayBooks[] = $book_item_mod;
-        }
+        $stmt_mod_q->execute(); $result_mod_q = $stmt_mod_q->get_result();
+        while ($book_item_mod = $result_mod_q->fetch_assoc()) { $displayBooks[] = $book_item_mod; }
         $stmt_mod_q->close();
     } else { $errors[] = "Kļūda ielādējot moderācijas sarakstu: " . $savienojums->error; }
 } else { 
+    if (!$savienojums || $savienojums->connect_errno) { require 'connect_db.php'; }
     $stmt_user_b = $savienojums->prepare("SELECT GramatasID, Nosaukums, Autors, Zanrs, Valoda, IzdosanasGads, Attels, Status, Stavoklis, GaidaDzesanuLidz FROM bookswap_books WHERE LietotajsID = ? ORDER BY PievienosanasDatums DESC");
     if ($stmt_user_b) {
-        $stmt_user_b->bind_param("i", $userId);
-        $stmt_user_b->execute();
+        $stmt_user_b->bind_param("i", $userId); $stmt_user_b->execute();
         $result_user_b = $stmt_user_b->get_result();
-        while ($book_item_user = $result_user_b->fetch_assoc()) {
-            $displayBooks[] = $book_item_user;
-        }
+        while ($book_item_user = $result_user_b->fetch_assoc()) { $displayBooks[] = $book_item_user; }
         $stmt_user_b->close();
     } else { $errors[] = "Kļūda ielādējot jūsu grāmatas: " . $savienojums->error; }
 }
 
-if ($savienojums) $savienojums->close();
+$incoming_requests = []; $outgoing_requests = [];
+if (!$savienojums || $savienojums->connect_errno) { require 'connect_db.php'; }
+if ($savienojums && !is_string($savienojums)) {
+    $stmt_incoming = $savienojums->prepare("SELECT er.*, u_initiator.Lietotajvards AS IniciatorsVards, b_offered.Nosaukums AS PiedavataGramataNosaukums, b_offered.Attels AS PiedavataGramataAttels, b_requested.Nosaukums AS VelamaGramataNosaukums, b_requested.Attels AS VelamaGramataAttels FROM bookswap_exchange_requests er JOIN bookswap_users u_initiator ON er.IniciatorsID = u_initiator.LietotajsID JOIN bookswap_books b_offered ON er.PiedavatGramataID = b_offered.GramatasID JOIN bookswap_books b_requested ON er.VelamaiGramataID = b_requested.GramatasID WHERE er.AdresatsID = ? AND er.Status = 'Gaida' ORDER BY er.IzveidotsDatums DESC");
+    if($stmt_incoming){ $stmt_incoming->bind_param("i", $userId); $stmt_incoming->execute(); $result_incoming = $stmt_incoming->get_result(); while($row_inc = $result_incoming->fetch_assoc()) { $incoming_requests[] = $row_inc; } $stmt_incoming->close(); }
+    $stmt_outgoing = $savienojums->prepare("SELECT er.*, u_adresats.Lietotajvards AS AdresatsVards, b_offered.Nosaukums AS PiedavataGramataNosaukums, b_offered.Attels AS PiedavataGramataAttels, b_requested.Nosaukums AS VelamaGramataNosaukums, b_requested.Attels AS VelamaGramataAttels FROM bookswap_exchange_requests er JOIN bookswap_users u_adresats ON er.AdresatsID = u_adresats.LietotajsID JOIN bookswap_books b_offered ON er.PiedavatGramataID = b_offered.GramatasID JOIN bookswap_books b_requested ON er.VelamaiGramataID = b_requested.GramatasID WHERE er.IniciatorsID = ? AND er.Status = 'Gaida' ORDER BY er.IzveidotsDatums DESC");
+    if($stmt_outgoing){ $stmt_outgoing->bind_param("i", $userId); $stmt_outgoing->execute(); $result_outgoing = $stmt_outgoing->get_result(); while($row_out = $result_outgoing->fetch_assoc()) { $outgoing_requests[] = $row_out; } $stmt_outgoing->close(); }
+}
+
+if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savienojums->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -376,9 +405,9 @@ if ($savienojums) $savienojums->close();
   <link rel="stylesheet" href="book.css"> 
   <style>
     .hidden { display: none; }
-    .add-book-section, .password-change-section, .moderation-section { margin-top: 20px; padding: 20px; background-color: var(--color-paper); border-radius: var(--radius-lg); }
+    .add-book-section, .password-change-section, .moderation-section, .exchange-requests-section { margin-top: 20px; padding: 20px; background-color: var(--color-paper); border-radius: var(--radius-lg); }
     .form-section-title { margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid var(--color-paper); padding-bottom: 10px; }
-    .user-books, .moderation-queue { margin-top: 20px; }
+    .user-books, .moderation-queue, .issue-reports-list, .exchange-request-grid { margin-top: 20px; }
     .books-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; margin-top: 20px; }
     .book-card { background-color: var(--color-white); border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--color-paper); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); display: flex; flex-direction: column; position:relative; }
     .book-card.pending-deletion { border-left: 5px solid orange; }
@@ -417,46 +446,31 @@ if ($savienojums) $savienojums->close();
     .modal-content input[type="text"] { width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid var(--color-paper); border-radius: var(--radius-md); }
     .modal-footer-buttons { display: flex; justify-content: flex-end; gap: 10px; }
     #confirmDeleteBookBtnModal:disabled, #confirmRejectBookBtnModal:disabled { background-color: #ccc; cursor: not-allowed; }
-    .issue-reports-section {
-    margin-top: 20px;
-}
-.issue-reports-list {
-    display: grid;
-    grid-template-columns: 1fr; /* Или repeat(auto-fill, minmax(300px, 1fr)); для нескольких колонок */
-    gap: 20px;
-}
-.issue-report-card {
-    background-color: var(--color-white);
-    border: 1px solid var(--color-paper);
-    border-left: 5px solid var(--color-burgundy); /* Акцент для отчетов */
-    border-radius: var(--radius-md);
-    padding: 15px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
-.issue-report-card h4 {
-    font-family: var(--font-serif);
-    color: var(--color-darkwood);
-    margin-top: 0;
-    margin-bottom: 10px;
-}
-.issue-report-card p {
-    margin-bottom: 8px;
-    font-size: 0.9rem;
-    line-height: 1.5;
-}
-.issue-report-card p strong {
-    font-weight: 500;
-    color: var(--color-darkwood);
-}
-.issue-report-card .status-badge {
-    background-color: var(--color-leather); /* Пример цвета для статуса "Jauns" */
-    color: white;
-    font-size: 0.75rem;
-}
-/* Добавьте стили для других статусов отчетов, если они появятся */
-.issue-report-card .status-badge.apstradats {
-    background-color: #66bb6a; /* Зеленый для обработанных */
-}
+    .issue-reports-section { margin-top: 20px; }
+    .issue-reports-list { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    .issue-report-card { background-color: var(--color-white); border: 1px solid var(--color-paper); border-left: 5px solid var(--color-burgundy); border-radius: var(--radius-md); padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .issue-report-card h4 { font-family: var(--font-serif); color: var(--color-darkwood); margin-top: 0; margin-bottom: 10px; }
+    .issue-report-card p { margin-bottom: 8px; font-size: 0.9rem; line-height: 1.5; }
+    .issue-report-card p strong { font-weight: 500; color: var(--color-darkwood); }
+    .issue-report-card .status-badge { background-color: var(--color-leather); color: white; font-size: 0.75rem; }
+    .issue-report-card .status-badge.apstradats { background-color: #66bb6a; }
+    .exchange-requests-section { margin-top: 30px; }
+    .exchange-request-grid { display: flex; flex-direction: column; gap: 20px; }
+    .exchange-request-card { background-color: var(--color-white); border: 1px solid var(--color-paper); border-radius: var(--radius-lg); padding: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.07); }
+    .exchange-request-card h5 { font-family: var(--font-serif); margin-top: 0; margin-bottom: 15px; font-size: 1.1rem; color: var(--color-darkwood); border-bottom: 1px solid var(--color-paper); padding-bottom: 8px; }
+    .exchange-books-display { display: flex; align-items: flex-start; justify-content: space-between; gap:15px; margin-bottom: 15px; }
+    .exchange-book-item { text-align: center; flex-basis: 45%; display: flex; flex-direction: column; align-items: center;}
+    .exchange-book-item img, .exchange-book-item .book-cover-fallback { width: 100px; height: 150px; object-fit: cover; border-radius: var(--radius-sm); margin-bottom: 8px; border: 1px solid var(--color-light-gray); }
+    .exchange-book-item .book-cover-fallback { display: flex; align-items: center; justify-content: center; background-color: var(--color-light-gray); }
+    .exchange-book-item .book-cover-fallback svg{ width: 40px; height: 40px; color: var(--color-gray); }
+    .exchange-book-item p { font-size: 0.8rem; color: var(--color-gray); margin-top: 3px; line-height: 1.3; }
+    .exchange-book-item strong { font-size: 0.9rem; color: var(--color-darkwood); display: block; white-space: normal; overflow-wrap: break-word; margin-bottom: 3px; }
+    .exchange-arrow { font-size: 2.5rem; color: var(--color-darkwood); margin: auto 10px; align-self: center; flex-shrink: 0; }
+    .exchange-request-info p { margin-bottom: 8px; font-size: 0.9rem; }
+    .exchange-request-actions { margin-top: 15px; text-align: right; display: flex; justify-content: flex-end; gap: 10px; }
+    .exchange-request-message { background-color: var(--color-cream); padding: 12px; border-radius: var(--radius-sm); margin-top:12px; font-style: italic; font-size: 0.85rem; border: 1px dashed var(--color-paper);}
+    .exchange-request-message strong { display:block; margin-bottom: 5px; font-style: normal;}
+    .exchange-requests-section > h4 { font-family: var(--font-serif); font-size:1.3rem; margin-bottom:15px; color:var(--color-darkwood); padding-bottom:10px; border-bottom: 1px solid var(--color-paper); }
   </style>
 </head>
 <body data-current-user-id="<?php echo isLoggedIn() ? htmlspecialchars($_SESSION['user_id']) : '0'; ?>">
@@ -529,13 +543,13 @@ if ($savienojums) $savienojums->close();
             <?php if (!empty($success)): ?>
             <div class="toast show" style="background-color: #d4edda; color: #155724; border-color: #c3e6cb; margin-bottom: 10px;">
                 <div class="toast-content"><div class="toast-icon success" style="color: #155724;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div><p class="toast-message"><?php echo htmlspecialchars($success); ?></p></div>
-                <button class="toast-close" onclick="this.parentElement.remove()" style="color: #155724; background: transparent; border: none; font-size: 1.5rem; position: absolute; top: 5px; right: 10px;">×</button>
+                <button class="toast-close" onclick="this.parentElement.remove()" style="color: #155724; background: transparent; border: none; font-size: 1.5rem; position: absolute; top: 5px; right: 10px;">&times;</button>
             </div>
             <?php endif; ?>
             <?php if (!empty($errors)): ?>
             <div class="auth-error active" style="background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; padding: 15px; border-radius: .25rem; margin-bottom: 10px; position:relative;">
                 <?php foreach ($errors as $error): ?><p><?php echo htmlspecialchars($error); ?></p><?php endforeach; ?>
-                 <button class="toast-close" onclick="this.parentElement.remove()" style="background:transparent; border:none; font-size:1.5rem; color: #721c24; position:absolute; top:5px; right:10px;">×</button>
+                 <button class="toast-close" onclick="this.parentElement.remove()" style="background:transparent; border:none; font-size:1.5rem; color: #721c24; position:absolute; top:5px; right:10px;">&times;</button>
             </div>
             <?php endif; ?>
         </div>
@@ -575,8 +589,8 @@ if ($savienojums) $savienojums->close();
                              $activeBookCount = count(array_filter($displayBooks, function($book){ 
                                 return $book['Status'] !== 'Dzēsta' && $book['Status'] !== 'Apmainīta'; 
                             }));
-                        } else { // For moderators/admins, count books awaiting approval
-                            $activeBookCount = count($displayBooks); // $displayBooks already filtered for them
+                        } else { 
+                            $activeBookCount = count($displayBooks); 
                         }
                         echo $activeBookCount;
                     ?>
@@ -773,6 +787,123 @@ if ($savienojums) $savienojums->close();
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
+             <!-- НОВЫЙ РАЗДЕЛ: Grāmatu maiņas -->
+                        <div class="form-section-title"><h3>Grāmatu maiņas</h3></div>
+                        <div class="exchange-requests-section">
+                            
+                            <h4>Ienākošie pieprasījumi (Gaida jūsu atbildi)</h4>
+                            <?php if (empty($incoming_requests)): ?>
+                                <p class="no-books-message">Jums nav jaunu ienākošo maiņas pieprasījumu.</p>
+                            <?php else: ?>
+                                <div class="exchange-request-grid">
+                                    <?php foreach ($incoming_requests as $req): ?>
+                                        <div class="exchange-request-card" id="incoming-request-<?php echo $req['PieprasijumaID']; ?>">
+                                            <div class="exchange-books-display">
+                                                <div class="exchange-book-item">
+                                                    <strong><?php echo htmlspecialchars($req['PiedavataGramataNosaukums']); ?></strong>
+                                                    <?php 
+                                                        $offered_cover_path = '';
+                                                        if (!empty($req['PiedavataGramataAttels'])) {
+                                                            if (filter_var($req['PiedavataGramataAttels'], FILTER_VALIDATE_URL)) $offered_cover_path = htmlspecialchars($req['PiedavataGramataAttels']);
+                                                            elseif (file_exists($req['PiedavataGramataAttels'])) $offered_cover_path = htmlspecialchars($req['PiedavataGramataAttels']);
+                                                        }
+                                                    ?>
+                                                    <?php if ($offered_cover_path): ?>
+                                                        <img src="<?php echo $offered_cover_path; ?>?t=<?php echo time(); ?>" alt="Offered Book">
+                                                    <?php else: ?>
+                                                        <div class="book-cover-fallback"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+                                                    <?php endif; ?>
+                                                    <p>Piedāvā: <?php echo htmlspecialchars($req['IniciatorsVards']); ?></p>
+                                                </div>
+                                                <span class="exchange-arrow">⇄</span>
+                                                <div class="exchange-book-item">
+                                                    <strong><?php echo htmlspecialchars($req['VelamaGramataNosaukums']); ?></strong>
+                                                     <?php 
+                                                        $requested_cover_path = '';
+                                                        if (!empty($req['VelamaGramataAttels'])) {
+                                                            if (filter_var($req['VelamaGramataAttels'], FILTER_VALIDATE_URL)) $requested_cover_path = htmlspecialchars($req['VelamaGramataAttels']);
+                                                            elseif (file_exists($req['VelamaGramataAttels'])) $requested_cover_path = htmlspecialchars($req['VelamaGramataAttels']);
+                                                        }
+                                                    ?>
+                                                    <?php if ($requested_cover_path): ?>
+                                                        <img src="<?php echo $requested_cover_path; ?>?t=<?php echo time(); ?>" alt="Requested Book">
+                                                    <?php else: ?>
+                                                        <div class="book-cover-fallback"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+                                                    <?php endif; ?>
+                                                    <p>Jūsu grāmata</p>
+                                                </div>
+                                            </div>
+                                            <?php if(!empty($req['ApmaijnasTekets'])): ?>
+                                                <div class="exchange-request-message">
+                                                    <strong>Ziņa no <?php echo htmlspecialchars($req['IniciatorsVards']); ?>:</strong>
+                                                    <p><?php echo nl2br(htmlspecialchars($req['ApmaijnasTekets'])); ?></p>
+                                                </div>
+                                            <?php endif; ?>
+                                            <div class="exchange-request-actions">
+                                                <button class="btn btn-small-action btn-approve-book" onclick="handleExchangeRequest(<?php echo $req['PieprasijumaID']; ?>, 'approve', <?php echo $req['IniciatorsID']; ?>, '<?php echo htmlspecialchars(addslashes($req['IniciatorsVards'])); ?>')">Apstiprināt</button>
+                                                <button class="btn btn-small-action btn-reject-book" onclick="handleExchangeRequest(<?php echo $req['PieprasijumaID']; ?>, 'reject')">Noraidīt</button>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+
+                            <h4 style="margin-top: 30px;">Izejošie pieprasījumi (Gaida atbildi)</h4>
+                            <?php if (empty($outgoing_requests)): ?>
+                                <p class="no-books-message">Jums nav aktīvu izejošo maiņas pieprasījumu.</p>
+                            <?php else: ?>
+                                 <div class="exchange-request-grid">
+                                    <?php foreach ($outgoing_requests as $req): ?>
+                                        <div class="exchange-request-card" id="outgoing-request-<?php echo $req['PieprasijumaID']; ?>">
+                                            <div class="exchange-books-display">
+                                                <div class="exchange-book-item">
+                                                    <strong><?php echo htmlspecialchars($req['PiedavataGramataNosaukums']); ?></strong>
+                                                     <?php 
+                                                        $offered_out_cover_path = '';
+                                                        if (!empty($req['PiedavataGramataAttels'])) {
+                                                            if (filter_var($req['PiedavataGramataAttels'], FILTER_VALIDATE_URL)) $offered_out_cover_path = htmlspecialchars($req['PiedavataGramataAttels']);
+                                                            elseif (file_exists($req['PiedavataGramataAttels'])) $offered_out_cover_path = htmlspecialchars($req['PiedavataGramataAttels']);
+                                                        }
+                                                    ?>
+                                                    <?php if ($offered_out_cover_path): ?>
+                                                        <img src="<?php echo $offered_out_cover_path; ?>?t=<?php echo time(); ?>" alt="Offered Book">
+                                                    <?php else: ?>
+                                                        <div class="book-cover-fallback"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+                                                    <?php endif; ?>
+                                                    <p>Jūsu piedāvājums</p>
+                                                </div>
+                                                <span class="exchange-arrow">⇄</span>
+                                                <div class="exchange-book-item">
+                                                    <strong><?php echo htmlspecialchars($req['VelamaGramataNosaukums']); ?></strong>
+                                                    <?php 
+                                                        $requested_out_cover_path = '';
+                                                        if (!empty($req['VelamaGramataAttels'])) {
+                                                            if (filter_var($req['VelamaGramataAttels'], FILTER_VALIDATE_URL)) $requested_out_cover_path = htmlspecialchars($req['VelamaGramataAttels']);
+                                                            elseif (file_exists($req['VelamaGramataAttels'])) $requested_out_cover_path = htmlspecialchars($req['VelamaGramataAttels']);
+                                                        }
+                                                    ?>
+                                                    <?php if ($requested_out_cover_path): ?>
+                                                        <img src="<?php echo $requested_out_cover_path; ?>?t=<?php echo time(); ?>" alt="Requested Book">
+                                                    <?php else: ?>
+                                                        <div class="book-cover-fallback"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+                                                    <?php endif; ?>
+                                                    <p>Pieprasīts no: <?php echo htmlspecialchars($req['AdresatsVards']); ?></p>
+                                                </div>
+                                            </div>
+                                            <div class="exchange-request-info">
+                                                <p>Status: <span class="status-badge gaida"><?php echo htmlspecialchars($req['Status']); ?></span></p>
+                                                 <?php if(!empty($req['ApmaijnasTekets'])): ?>
+                                                    <div class="exchange-request-message">
+                                                        <strong>Jūsu ziņa:</strong>
+                                                        <p><?php echo nl2br(htmlspecialchars($req['ApmaijnasTekets'])); ?></p>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
           </div>
         </div>
       </div>
@@ -1018,6 +1149,69 @@ if ($savienojums) $savienojums->close();
                 } else { showUIMessage(data.message || 'Kļūda.', 'error'); }
             }).catch(error => showUIMessage('Tīkla kļūda.', 'error'));
         }
+        
+        window.markReportAs = function(newStatus, reportId) {
+            if (!confirm(`Vai tiešām vēlaties mainīt šī ziņojuma statusu uz "${newStatus}"?`)) { return; }
+            const formData = new FormData();
+            formData.append('ajax_action', 'update_report_status'); 
+            formData.append('report_id', reportId);
+            formData.append('new_status', newStatus);
+            fetch('profile.php', { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showUIMessage(data.message, 'success');
+                    const reportCard = document.getElementById(`issue-report-${reportId}`);
+                    if (reportCard) {
+                        if (newStatus === 'dzēsts') { reportCard.remove();
+                            const reportList = document.querySelector('.issue-reports-list');
+                            if (reportList && reportList.children.length === 0) {
+                                const noReportsMsg = document.querySelector('.issue-reports-section .no-books-message');
+                                if(noReportsMsg) noReportsMsg.style.display = 'block';
+                                else { const p = document.createElement('p'); p.className = 'no-books-message'; p.textContent = 'Nav jaunu ziņojumu par problēmām.'; document.querySelector('.issue-reports-section').appendChild(p); }
+                            }
+                        } else {
+                            const statusBadge = reportCard.querySelector('.status-badge');
+                            if (statusBadge) { statusBadge.textContent = newStatus; statusBadge.className = `status-badge ${newStatus.toLowerCase().replace(' ', '-')}`; }
+                            const actionsFooter = reportCard.querySelector('.report-actions-footer');
+                            if(actionsFooter) actionsFooter.innerHTML = '<p><em>Statuss atjaunināts.</em></p>';
+                        }
+                    }
+                } else { showUIMessage(data.message || 'Kļūda atjauninot ziņojuma statusu.', 'error'); }
+            }).catch(error => { showUIMessage('Tīkla kļūda, mēģiniet vēlāk.', 'error'); });
+        }
+
+        window.handleExchangeRequest = function(requestId, decision, initiatorId = null, initiatorName = null) {
+            const actionText = decision === 'approve' ? 'apstiprināt' : 'noraidīt';
+            if (!confirm(`Vai tiešām vēlaties ${actionText} šo maiņas pieprasījumu?`)) { return; }
+            const formData = new FormData();
+            formData.append('ajax_action', 'handle_exchange_request');
+            formData.append('request_id', requestId);
+            formData.append('decision', decision);
+            fetch('profile.php', { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showUIMessage(data.message, 'success');
+                    const requestCard = document.getElementById(`incoming-request-${requestId}`);
+                    if (requestCard) { requestCard.remove(); 
+                        const incomingGrid = document.querySelector('.exchange-requests-section h4:first-of-type + .exchange-request-grid'); 
+                        if (incomingGrid && incomingGrid.children.length === 0) {
+                             const p = document.createElement('p'); p.className = 'no-books-message'; p.textContent = 'Jums nav jaunu ienākošo maiņas pieprasījumu.';
+                             incomingGrid.parentNode.insertBefore(p, incomingGrid.nextSibling); incomingGrid.remove(); 
+                        }
+                    }
+                    if (decision === 'approve' && data.initiator_id && data.initiator_name) {
+                        if (confirm(`Maiņa apstiprināta! Vai vēlaties sākt sarunu ar ${data.initiator_name}?`)) {
+                            if (typeof window.initiateChatWithUser === 'function') {
+                                window.initiateChatWithUser(data.initiator_id, data.initiator_name);
+                            }
+                        }
+                    }
+                } else { showUIMessage(data.message || 'Kļūda apstrādājot pieprasījumu.', 'error'); }
+            }).catch(error => showUIMessage('Tīkla kļūda.', 'error'));
+        }
+
 
         function showUIMessage(message, type = 'success') {
             const container = document.getElementById('toast-container') || document.body;
@@ -1035,68 +1229,14 @@ if ($savienojums) $savienojums->close();
                     <div class="toast-icon" style="margin-right:10px; color: ${type === 'success' ? '#155724' : '#721c24'};">${iconSvg}</div>
                     <p class="toast-message" style="margin:0;">${message}</p>
                 </div>
-                <button class="toast-close" onclick="this.parentElement.remove()" style="background:none; border:none; font-size:1.2rem; line-height:1; color: ${type === 'success' ? '#155724' : '#721c24'}; position:absolute; top:50%; right:15px; transform:translateY(-50%);">×</button>`;
+                <button class="toast-close" onclick="this.parentElement.remove()" style="background:none; border:none; font-size:1.2rem; line-height:1; color: ${type === 'success' ? '#155724' : '#721c24'}; position:absolute; top:50%; right:15px; transform:translateY(-50%);">&times;</button>`;
             toastDiv.style.padding = '15px'; toastDiv.style.borderRadius = '.25rem'; toastDiv.style.marginBottom = '10px'; toastDiv.style.position = 'relative'; 
             if(toastContainer){ toastContainer.appendChild(toastDiv); } 
             else { toastDiv.style.position = 'fixed'; toastDiv.style.top = '20px'; toastDiv.style.right = '20px'; toastDiv.style.zIndex = '1050'; document.body.appendChild(toastDiv); }
             setTimeout(() => { toastDiv.remove(); }, 5000);
         }
+
     });
-    window.markReportAs = function(newStatus, reportId) {
-    if (!confirm(`Vai tiešām vēlaties mainīt šī ziņojuma statusu uz "${newStatus}"?`)) {
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('ajax_action', 'update_report_status'); // Нужен новый AJAX action
-    formData.append('report_id', reportId);
-    formData.append('new_status', newStatus);
-
-    fetch('profile.php', { // Отправляем на тот же profile.php
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showUIMessage(data.message, 'success');
-            const reportCard = document.getElementById(`issue-report-${reportId}`);
-            if (reportCard) {
-                if (newStatus === 'dzēsts') { // Если статус "dzēsts", удаляем карточку
-                    reportCard.remove();
-                     // Проверка, не пуст ли список после удаления
-                    const reportList = document.querySelector('.issue-reports-list');
-                    if (reportList && reportList.children.length === 0) {
-                        const noReportsMsg = document.querySelector('.issue-reports-section .no-books-message');
-                        if(noReportsMsg) noReportsMsg.style.display = 'block';
-                        else {
-                             const p = document.createElement('p');
-                             p.className = 'no-books-message';
-                             p.textContent = 'Nav jaunu ziņojumu par problēmām.';
-                             document.querySelector('.issue-reports-section').appendChild(p);
-                        }
-                    }
-                } else {
-                    const statusBadge = reportCard.querySelector('.status-badge');
-                    if (statusBadge) {
-                        statusBadge.textContent = newStatus;
-                        statusBadge.className = `status-badge ${newStatus.toLowerCase().replace(' ', '-')}`;
-                    }
-                    // Можно скрыть кнопки после обработки, если нужно
-                    const actionsFooter = reportCard.querySelector('.report-actions-footer');
-                    if(actionsFooter) actionsFooter.innerHTML = '<p><em>Statuss atjaunināts.</em></p>';
-                }
-            }
-        } else {
-            showUIMessage(data.message || 'Kļūda atjauninot ziņojuma statusu.', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error updating report status:', error);
-        showUIMessage('Tīkla kļūda, mēģiniet vēlāk.', 'error');
-    });
-}
-
   </script>
 
  <!-- Chat Widget Start -->
@@ -1146,4 +1286,3 @@ if ($savienojums) $savienojums->close();
 
 </body>
 </html>
-
