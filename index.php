@@ -3,8 +3,37 @@ require_once 'session_check.php';
 require_once 'connect_db.php';
 
 $featured_books_for_js = [];
+$user_wishlist_ids_for_index_js = []; // Jauns mainīgais priekš index.php
+
+// Ielādējam lietotāja vēlmju saraksta ID, ja lietotājs ir ielogojies
+if (isLoggedIn()) {
+    $current_user_id_index = $_SESSION['user_id'];
+    if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) {
+        // Pārbaudām savienojumu pirms lietošanas
+    } else {
+        require_once 'connect_db.php'; // Mēģinām atjaunot savienojumu
+    }
+
+    if ($savienojums && !is_string($savienojums)) {
+        $stmt_user_wish_idx = $savienojums->prepare("SELECT GramatasID FROM bookswap_wishlist WHERE LietotajsID = ?");
+        if ($stmt_user_wish_idx) {
+            $stmt_user_wish_idx->bind_param("i", $current_user_id_index);
+            $stmt_user_wish_idx->execute();
+            $result_user_wish_idx = $stmt_user_wish_idx->get_result();
+            while ($row_wish_idx = $result_user_wish_idx->fetch_assoc()) {
+                $user_wishlist_ids_for_index_js[] = $row_wish_idx['GramatasID'];
+            }
+            $stmt_user_wish_idx->close();
+        }
+    }
+}
+
 
 try {
+    if (!$savienojums || $savienojums->connect_errno) { 
+        require_once 'connect_db.php'; 
+    }
+
     $sql_featured = "SELECT 
                         b.GramatasID, b.Nosaukums, b.Autors, b.Zanrs, b.Attels, b.Stavoklis,
                         u.LietotajsID AS UserID_DB, u.Lietotajvards 
@@ -32,17 +61,16 @@ try {
                 'author' => $row_f['Autors'],
                 'coverImage' => $cover_path_f,
                 'genre' => $row_f['Zanrs'],
-                'condition' => $row_f['Stavoklis'], // Используем Stavoklis из БД
+                'condition' => $row_f['Stavoklis'],
                 'listedBy' => $row_f['Lietotajvards'],
                 'userId' => $row_f['UserID_DB']
             ];
         }
-    } else {
-        // error_log("Error fetching featured books for index.php: " . $savienojums->error);
     }
-    if($savienojums) $savienojums->close();
+    if($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savienojums->close();
 } catch (Exception $e) {
     error_log("Exception fetching featured books for index.php: " . $e->getMessage());
+    if($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savienojums->close();
 }
 ?>
 <!DOCTYPE html>
@@ -60,6 +88,19 @@ try {
     <meta name="twitter:site" content="@bookswap" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+     <style> /* Pievienojam stilus wishlist pogai, ja tie nav globāli styles.css */
+        .book-cover { position: relative; /* Svarīgi priekš wishlist pogas pozicionēšanas */ }
+        .wishlist-button {
+            position: absolute; top: var(--spacing-2); right: var(--spacing-2);
+            background-color: hsla(0,0%,100%,0.8); border-radius: 50%;
+            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+            color: var(--color-burgundy); border: none; cursor: pointer;
+            transition: background-color 0.2s, color 0.2s; z-index: 5;
+        }
+        .wishlist-button:hover { background-color: var(--color-white); }
+        .wishlist-button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .wishlist-button svg.filled { fill: var(--color-burgundy); }
+    </style>
   </head>
 
   <body data-current-user-id="<?php echo isLoggedIn() ? htmlspecialchars($_SESSION['user_id']) : '0'; ?>">
@@ -229,7 +270,6 @@ try {
               <p class="section-description">Izpētiet mūsu plašo grāmatu kolekciju, kas sakārtota pēc žanra, lai atrastu nākamo lielisko lasāmvielu.</p>
             </div>
             <div class="genres-grid" id="genresGrid">
-              <!-- Genres will be populated by JavaScript from script.js (sample data) -->
             </div>
           </div>
         </section>
@@ -241,7 +281,6 @@ try {
               <p class="section-description">Pievienojieties tūkstošiem laimīgu lasītāju, kas jau apmainās ar grāmatām, izmantojot mūsu platformu.</p>
             </div>
             <div class="testimonials-grid" id="testimonialsGrid">
-              <!-- Testimonials will be populated by JavaScript from script.js (sample data) -->
             </div>
           </div>
         </section>
@@ -315,6 +354,9 @@ try {
         </div>
       </footer>
     </div>
+    <!-- Toast Container for index.php -->
+    <div id="toast-container-index" style="position: fixed; bottom: 70px; right: 20px; z-index: 1055;"></div>
+
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -329,16 +371,19 @@ try {
           });
         }
 
-        // --- JavaScript for Featured Books (from PHP) ---
         const featuredBooksData = <?php echo json_encode($featured_books_for_js, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-        const featuredBooksContainer = document.getElementById('featuredBooksGrid'); // Changed ID to avoid conflict with browse.php
+        const userWishlistedBookIdsIndex = <?php echo json_encode($user_wishlist_ids_for_index_js); ?>; // Jaunais masīvs
+        const currentLoggedInUserIdIndex = <?php echo isLoggedIn() ? json_encode($_SESSION['user_id']) : 'null'; ?>; // Pašreizējā lietotāja ID
+
+        const featuredBooksContainer = document.getElementById('featuredBooksGrid'); 
 
         function createBookCard(book) {
             const bookElement = document.createElement('div');
             bookElement.className = 'book-card';
+            bookElement.dataset.bookId = book.id; // Saglabājam ID
             
             const coverDiv = document.createElement('div');
-            coverDiv.className = 'book-cover';
+            coverDiv.className = 'book-cover'; // styles.css ir position: relative
              let coverHtml = `<div class="fallback-cover" style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; background-color: var(--color-light-gray);"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-gray)" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg></div>`;
 
             if (book.coverImage) {
@@ -350,38 +395,79 @@ try {
             const wishlistBtn = document.createElement('button');
             wishlistBtn.className = 'wishlist-button';
             wishlistBtn.setAttribute('aria-label', 'Add to wishlist');
-            wishlistBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`;
+            const heartIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`;
+            wishlistBtn.innerHTML = heartIconSvg;
+            const heartIcon = wishlistBtn.querySelector('svg');
+
+            // Pārbauda, vai grāmata ir vēlmju sarakstā
+            if (currentLoggedInUserIdIndex && userWishlistedBookIdsIndex && userWishlistedBookIdsIndex.includes(parseInt(book.id))) {
+                heartIcon.classList.add('filled');
+                heartIcon.setAttribute('fill', 'var(--color-burgundy)');
+            } else {
+                heartIcon.setAttribute('fill', 'none');
+            }
+
+            if (!currentLoggedInUserIdIndex) {
+                wishlistBtn.disabled = true;
+                wishlistBtn.title = "Pieslēdzieties, lai pievienotu vēlmēm";
+            }
+
             wishlistBtn.addEventListener('click', function(e) {
                 e.preventDefault(); e.stopPropagation();
-                const heartIcon = this.querySelector('svg');
-                const isWishlisted = heartIcon.getAttribute('fill') === 'var(--color-burgundy)';
-                if (!isWishlisted) heartIcon.setAttribute('fill', 'var(--color-burgundy)');
-                else heartIcon.setAttribute('fill', 'none');
+                if (!currentLoggedInUserIdIndex) {
+                    showToastIndex('Lūdzu, pieslēdzieties, lai izmantotu vēlmju sarakstu.', 'error');
+                    return;
+                }
+                
+                const currentBookId = this.closest('.book-card').dataset.bookId;
+                wishlistBtn.disabled = true;
+
+                const formData = new FormData();
+                formData.append('ajax_action', 'toggle_wishlist');
+                formData.append('book_id', currentBookId);
+
+                fetch('profile.php', { method: 'POST', body: formData }) // Pieprasījums uz profile.php
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToastIndex(data.message, 'success');
+                        const localHeartIcon = this.querySelector('svg');
+                        if (data.wishlisted) {
+                            localHeartIcon.classList.add('filled');
+                            localHeartIcon.setAttribute('fill', 'var(--color-burgundy)');
+                            if(userWishlistedBookIdsIndex && !userWishlistedBookIdsIndex.includes(parseInt(currentBookId))) userWishlistedBookIdsIndex.push(parseInt(currentBookId));
+                        } else {
+                            localHeartIcon.classList.remove('filled');
+                            localHeartIcon.setAttribute('fill', 'none');
+                            if(userWishlistedBookIdsIndex) {
+                                const index = userWishlistedBookIdsIndex.indexOf(parseInt(currentBookId));
+                                if (index > -1) userWishlistedBookIdsIndex.splice(index, 1);
+                            }
+                        }
+                    } else { showToastIndex(data.message || 'Kļūda ar vēlmju sarakstu.', 'error'); }
+                })
+                .catch(error => showToastIndex('Tīkla kļūda ar vēlmju sarakstu.', 'error'))
+                .finally(() => { wishlistBtn.disabled = false; });
             });
             coverDiv.appendChild(wishlistBtn);
             
             const infoDiv = document.createElement('div');
             infoDiv.className = 'book-info';
-            
             const titleH3 = document.createElement('h3');
             titleH3.className = 'book-title';
             titleH3.textContent = book.title || 'Nav nosaukuma';
-            
             const authorP = document.createElement('p');
             authorP.className = 'book-author';
             authorP.textContent = book.author ? `by ${book.author}` : 'Nezināms autors';
-            
             const tagsDiv = document.createElement('div');
             tagsDiv.className = 'book-tags';
             if (book.genre) tagsDiv.innerHTML += `<span class="book-tag">${book.genre}</span>`;
-            if (book.condition) tagsDiv.innerHTML += `<span class="book-tag">${book.condition}</span>`; // Используем 'condition'
-            
+            if (book.condition) tagsDiv.innerHTML += `<span class="book-tag">${book.condition}</span>`; 
             const footerDiv = document.createElement('div');
             footerDiv.className = 'book-footer';
-            
             const ownerLink = document.createElement('a');
             ownerLink.className = 'book-owner';
-            ownerLink.href = `profile.php?user_id=${book.userId}`;
+            ownerLink.href = `profile.php?user_id=${book.userId}`; // Changed from user.html
             ownerLink.textContent = book.listedBy ? `Listed by ${book.listedBy}` : 'Nezināms';
             ownerLink.addEventListener('click', function(e){ e.stopPropagation(); });
 
@@ -410,13 +496,10 @@ try {
                 featuredBooksData.forEach(book => {
                     featuredBooksContainer.appendChild(createBookCard(book));
                 });
-            } else {
-                // featuredBooksContainer.innerHTML = '<p style="text-align:center; color:var(--color-gray);">Pašlaik nav jaunu grāmatu.</p>';
             }
         }
 
-        // --- JavaScript for Genres and Testimonials (Sample Data from original script.js) ---
-        const genres = [
+        const genres = [ /* ... (esošais genres masīvs no script.js) ... */ 
             { name: "Daiļliteratūra", icon: "📚", count: Math.floor(Math.random()*500+1000), color: "blue" },
             { name: "Detektīvs & Trilleris", icon: "🔍", count: Math.floor(Math.random()*500+500), color: "purple" },
             { name: "Zinātniskā Fantastika", icon: "🚀", count: Math.floor(Math.random()*400+400), color: "green" },
@@ -426,7 +509,7 @@ try {
             { name: "Biogrāfija", icon: "👤", count: Math.floor(Math.random()*200+200), color: "teal" },
             { name: "Vēsture", icon: "🏛️", count: Math.floor(Math.random()*200+100), color: "red" }
         ];
-        const testimonials = [
+        const testimonials = [ /* ... (esošais testimonials masīvs no script.js) ... */
           { quote: "Esmu atklājusi tik daudz pārsteidzošu grāmatu, kuras citādi nekad nebūtu paņēmusi rokās. Kopiena ir draudzīga, un darījumi vienmēr ir godīgi!", name: "Dženifera K.", title: "Grāmatu mīļotājs no Talsiem", rating: 5, image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80" },
           { quote: "Tā kā es daudz lasu, bet nevēlos visas grāmatas glabāt mūžīgi, BookSwap ir lielisks risinājums. Esmu ieguvusi draugus un atradusi arī retas grāmatas!", name: "Mihails R.", title: "Aizrautīgs lasītājs", rating: 5, image: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80" },
           { quote: "Platforma ir ļoti viegli lietojama, un man patīk, ka varu meklēt konkrētus nosaukumus vai vienkārši pārlūkot pieejamos. Grāmatu apmaiņa ir daudz labāka, nekā katru reizi pirkt jaunas", name: "Sofija L.", title: "Angļu valodas skolotājs", rating: 4, image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80" }
@@ -486,7 +569,6 @@ try {
           return testimonialElement;
         }
 
-        // Hero search functionality
         const heroSearchInput = document.getElementById('heroSearchInput');
         const heroSearchButton = document.getElementById('heroSearchButton');
         if(heroSearchButton && heroSearchInput){
@@ -503,6 +585,37 @@ try {
                     heroSearchButton.click();
                 }
             });
+        }
+
+        // Toast function for index.php
+        function showToastIndex(message, type = 'success') {
+            const container = document.getElementById('toast-container-index'); // Specific container
+            if (!container) { console.warn("Toast container for index not found"); return; }
+
+            const toastDiv = document.createElement('div');
+            // Use existing toast classes if they are globally defined and suitable
+            toastDiv.className = `toast show ${type === 'error' ? 'auth-error active' : ''}`; 
+            toastDiv.style.backgroundColor = type === 'success' ? '#d4edda' : '#f8d7da';
+            toastDiv.style.color = type === 'success' ? '#155724' : '#721c24';
+            toastDiv.style.borderColor = type === 'success' ? '#c3e6cb' : '#f5c6cb';
+            toastDiv.style.padding = '15px'; 
+            toastDiv.style.borderRadius = '.25rem'; 
+            toastDiv.style.marginBottom = '10px';
+            // toastDiv.style.position = 'relative'; // Positioned by its container
+            
+            let iconSvg = type === 'success' ? 
+                '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>' :
+                '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+            
+            toastDiv.innerHTML = `
+                <div class="toast-content" style="display:flex; align-items:center;">
+                    <div class="toast-icon" style="margin-right:10px; color: ${type === 'success' ? '#155724' : '#721c24'};">${iconSvg}</div>
+                    <p class="toast-message" style="margin:0;">${message}</p>
+                </div>
+                <button class="toast-close" onclick="this.parentElement.remove()" style="background:none; border:none; font-size:1.2rem; line-height:1; color: ${type === 'success' ? '#155724' : '#721c24'}; position:absolute; top:50%; right:15px; transform:translateY(-50%);">×</button>`;
+            
+            container.appendChild(toastDiv); 
+            setTimeout(() => { toastDiv.remove(); }, 3000);
         }
 
     });
@@ -526,12 +639,10 @@ try {
         </div>
         <div id="chat-body">
             <div id="chat-conversation-list">
-                <!-- Conversations will be loaded here by JS -->
                 <div class="loading-spinner hidden"><div class="spinner"></div></div>
             </div>
             <div id="chat-message-area" class="hidden">
                 <div id="chat-messages-display">
-                    <!-- Messages will be loaded here by JS -->
                      <div class="loading-spinner hidden"><div class="spinner"></div></div>
                 </div>
                 <form id="chat-message-form">
@@ -546,11 +657,8 @@ try {
         </div>
     </div>
 </div>
-<!-- Chat Widget End -->
-
-<!-- Подключаем CSS и JS для чата -->
-<link rel="stylesheet" href="chat.css?v=<?php echo time(); // Cache busting ?>">
-<script src="chat.js?v=<?php echo time(); // Cache busting ?>"></script>
+<link rel="stylesheet" href="chat.css?v=<?php echo time(); ?>">
+<script src="chat.js?v=<?php echo time(); ?>"></script>
 
   </body>
 </html>

@@ -3,11 +3,46 @@ require_once 'session_check.php';
 require_once 'connect_db.php';
 
 $books_data_for_js = []; 
-$all_genres_from_db = []; // Для динамического заполнения фильтра жанров
-$all_conditions_from_db = []; // Для динамического заполнения фильтра состояний
+$all_genres_from_db = [];
+$all_conditions_from_db = [];
+
+// WISHLIST: Fetch user's wishlist IDs
+$user_wishlist_ids_for_js = [];
+if (isLoggedIn()) {
+    $current_user_id_browse = $_SESSION['user_id'];
+    if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) { // Check if connection is valid
+        $stmt_user_wish = $savienojums->prepare("SELECT GramatasID FROM bookswap_wishlist WHERE LietotajsID = ?");
+        if ($stmt_user_wish) {
+            $stmt_user_wish->bind_param("i", $current_user_id_browse);
+            $stmt_user_wish->execute();
+            $result_user_wish = $stmt_user_wish->get_result();
+            while ($row_wish = $result_user_wish->fetch_assoc()) {
+                $user_wishlist_ids_for_js[] = $row_wish['GramatasID'];
+            }
+            $stmt_user_wish->close();
+        }
+    } else {
+        // Attempt to reconnect if connection was closed or invalid
+        require_once 'connect_db.php';
+        if ($savienojums && !is_string($savienojums)) {
+             $stmt_user_wish = $savienojums->prepare("SELECT GramatasID FROM bookswap_wishlist WHERE LietotajsID = ?");
+            if ($stmt_user_wish) {
+                $stmt_user_wish->bind_param("i", $current_user_id_browse);
+                $stmt_user_wish->execute();
+                $result_user_wish = $stmt_user_wish->get_result();
+                while ($row_wish = $result_user_wish->fetch_assoc()) {
+                    $user_wishlist_ids_for_js[] = $row_wish['GramatasID'];
+                }
+                $stmt_user_wish->close();
+            }
+        }
+    }
+}
+
 
 try {
-    // Выбираем все уникальные жанры и состояния из доступных книг для фильтров
+    if (!$savienojums || $savienojums->connect_errno) { require 'connect_db.php'; }
+
     $genres_query = $savienojums->query("SELECT DISTINCT Zanrs FROM bookswap_books WHERE Status = 'Pieejama' AND Zanrs IS NOT NULL AND Zanrs != '' ORDER BY Zanrs ASC");
     if($genres_query) {
         while($genre_row = $genres_query->fetch_assoc()){
@@ -16,33 +51,20 @@ try {
     }
 
     $conditions_query = $savienojums->query("SELECT DISTINCT Stavoklis FROM bookswap_books WHERE Status = 'Pieejama' AND Stavoklis IS NOT NULL AND Stavoklis != '' ORDER BY FIELD(Stavoklis, 'Kā jauna', 'Ļoti laba', 'Laba', 'Pieņemama')");
-    // FIELD() для кастомной сортировки ENUM или VARCHAR, если нужно
     if($conditions_query) {
         while($condition_row = $conditions_query->fetch_assoc()){
             $all_conditions_from_db[] = $condition_row['Stavoklis'];
         }
     }
 
-
-    // Основной запрос для получения книг
     $sql = "SELECT 
-                b.GramatasID, 
-                b.Nosaukums, 
-                b.Autors, 
-                b.Zanrs, 
-                b.Valoda,
-                b.IzdosanasGads,
-                b.Apraksts,
-                b.Attels, 
-                b.Status,
-                b.Stavoklis, -- Добавлено поле Stavoklis
-                u.LietotajsID AS UserID_DB, 
-                u.Lietotajvards 
+                b.GramatasID, b.Nosaukums, b.Autors, b.Zanrs, b.Valoda,
+                b.IzdosanasGads, b.Apraksts, b.Attels, b.Status, b.Stavoklis,
+                u.LietotajsID AS UserID_DB, u.Lietotajvards 
             FROM bookswap_books b
             JOIN bookswap_users u ON b.LietotajsID = u.LietotajsID
             WHERE b.Status = 'Pieejama'
             ORDER BY b.PievienosanasDatums DESC";
-
     $result = $savienojums->query($sql);
 
     if ($result) {
@@ -55,24 +77,22 @@ try {
                     $coverImagePath = htmlspecialchars($row['Attels']);
                 }
             }
-
             $books_data_for_js[] = [
                 'id' => $row['GramatasID'],
                 'title' => $row['Nosaukums'],
                 'author' => $row['Autors'],
                 'coverImage' => $coverImagePath,
                 'genre' => $row['Zanrs'],
-                'condition' => $row['Stavoklis'], // Используем значение из БД
+                'condition' => $row['Stavoklis'],
                 'listedBy' => $row['Lietotajvards'],
                 'userId' => $row['UserID_DB']
             ];
         }
-    } else {
-        // error_log("Error fetching books: " . $savienojums->error);
     }
-    if($savienojums) $savienojums->close();
+    if($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savienojums->close();
 } catch (Exception $e) {
-    // error_log("Exception fetching books: " . $e->getMessage());
+    // error_log("Exception fetching books for browse.php: " . $e->getMessage());
+     if($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savienojums->close();
 }
 ?>
 <!DOCTYPE html>
@@ -82,7 +102,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pārlūkot grāmatas - BookSwap</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css"> <!-- Ensure styles.css has .wishlist-button and .filled styles -->
     <link rel="stylesheet" href="browse.css">
   </head>
   <body data-current-user-id="<?php echo isLoggedIn() ? htmlspecialchars($_SESSION['user_id']) : '0'; ?>">
@@ -288,10 +308,17 @@ try {
       </footer>
     </div>
     
+    <!-- Toast Container for browse.php (if needed, or integrate with a global one) -->
+    <div id="toast-container-browse" style="position: fixed; bottom: 70px; right: 20px; z-index: 1055;"></div>
+
+
     <script src="script.js"></script> 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         const books = <?php echo json_encode($books_data_for_js, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+        const userWishlistedBookIds = <?php echo json_encode($user_wishlist_ids_for_js); ?>;
+        const currentLoggedInUserIdBrowse = <?php echo isLoggedIn() ? json_encode($_SESSION['user_id']) : 'null'; ?>;
+
         const booksGrid = document.getElementById('booksGrid');
         const noBooks = document.getElementById('noBooks');
         const searchInput = document.getElementById('searchInput');
@@ -314,13 +341,13 @@ try {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has('genre')) {
           const genreParam = urlParams.get('genre');
-          if (genreParam) { // Ensure genreParam is not empty
+          if (genreParam) { 
             currentGenre = genreParam;
             if(genreSelect) genreSelect.value = genreParam;
             if(genreSelectMobile) genreSelectMobile.value = genreParam;
           }
         }
-        if (urlParams.has('search')) { // Handle search from URL (e.g., from index.php)
+        if (urlParams.has('search')) { 
             const searchTermParam = urlParams.get('search');
             if(searchTermParam) {
                 currentSearchTerm = searchTermParam.toLowerCase();
@@ -334,9 +361,8 @@ try {
           const filteredBooks = books.filter(book => {
             const titleMatch = book.title ? book.title.toLowerCase().includes(currentSearchTerm) : false;
             const authorMatch = book.author ? book.author.toLowerCase().includes(currentSearchTerm) : false;
-            const matchesSearch = currentSearchTerm === '' ? true : (titleMatch || authorMatch); // Show all if search is empty
+            const matchesSearch = currentSearchTerm === '' ? true : (titleMatch || authorMatch);
             
-            // Exact match for genre and condition
             const matchesGenre = currentGenre === 'all' || (book.genre && book.genre.toLowerCase() === currentGenre.toLowerCase());
             const matchesCondition = currentCondition === 'all' || (book.condition && book.condition.toLowerCase() === currentCondition.toLowerCase());
             
@@ -354,22 +380,79 @@ try {
           }
         }
         
+        // This is your original createBookCard function structure
         function createBookCard(book) {
             const bookElement = document.createElement('div');
             bookElement.className = 'book-card';
+            bookElement.dataset.bookId = book.id; // Store book ID
+
             const coverDiv = document.createElement('div');
-            coverDiv.className = 'book-cover';
-            let coverHtml = `<div class="fallback-cover-js" style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; background-color: var(--color-light-gray);"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-gray)" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg></div>`;
+            coverDiv.className = 'book-cover'; // styles.css should handle position:relative for this
+             let coverHtml = `<div class="fallback-cover" style="display:flex; align-items:center; justify-content:center; width:100%; height:100%; background-color: var(--color-light-gray);"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-gray)" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg></div>`;
             if (book.coverImage) {
-                coverHtml = `<img src="${book.coverImage}?t=${new Date().getTime()}" alt="${book.title || 'Grāmata'}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                             <div class="fallback-cover-js" style="display:none; align-items:center; justify-content:center; width:100%; height:100%; background-color: var(--color-light-gray);"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>`;
+                 coverHtml = `<img src="${book.coverImage}?t=${new Date().getTime()}" alt="Cover of ${book.title || 'Grāmata'}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                             <div class="fallback-cover" style="display:none; align-items:center; justify-content:center; width:100%; height:100%; background-color: var(--color-light-gray);"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>`;
             }
             coverDiv.innerHTML = coverHtml;
-            const wishlistBtn = document.createElement('button'); /* ... wishlist button code ... */
-            wishlistBtn.className = 'wishlist-button'; wishlistBtn.setAttribute('aria-label', 'Pievienot vēlmēm');
-            wishlistBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`;
-            wishlistBtn.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); /* ... wishlist logic ... */ });
+
+            const wishlistBtn = document.createElement('button');
+            wishlistBtn.className = 'wishlist-button'; // General class from styles.css
+            wishlistBtn.setAttribute('aria-label', 'Pievienot vēlmēm');
+            const heartIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`;
+            wishlistBtn.innerHTML = heartIconSvg;
+            const heartIcon = wishlistBtn.querySelector('svg');
+
+            if (currentLoggedInUserIdBrowse && userWishlistedBookIds && userWishlistedBookIds.includes(parseInt(book.id))) {
+                heartIcon.classList.add('filled'); 
+                heartIcon.setAttribute('fill', 'var(--color-burgundy)');
+            } else {
+                heartIcon.setAttribute('fill', 'none');
+            }
+            
+            if (!currentLoggedInUserIdBrowse) {
+                wishlistBtn.disabled = true;
+                wishlistBtn.title = "Pieslēdzieties, lai pievienotu vēlmēm";
+            }
+
+            wishlistBtn.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                if (!currentLoggedInUserIdBrowse) {
+                    showToastBrowse('Lūdzu, pieslēdzieties, lai izmantotu vēlmju sarakstu.', 'error');
+                    return;
+                }
+                
+                const currentBookId = this.closest('.book-card').dataset.bookId;
+                wishlistBtn.disabled = true;
+
+                const formData = new FormData();
+                formData.append('ajax_action', 'toggle_wishlist');
+                formData.append('book_id', currentBookId);
+
+                fetch('profile.php', { method: 'POST', body: formData }) // Assuming profile.php handles wishlist
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToastBrowse(data.message, 'success');
+                        const localHeartIcon = this.querySelector('svg');
+                        if (data.wishlisted) {
+                            localHeartIcon.classList.add('filled');
+                            localHeartIcon.setAttribute('fill', 'var(--color-burgundy)');
+                            if(userWishlistedBookIds && !userWishlistedBookIds.includes(parseInt(currentBookId))) userWishlistedBookIds.push(parseInt(currentBookId));
+                        } else {
+                            localHeartIcon.classList.remove('filled');
+                            localHeartIcon.setAttribute('fill', 'none');
+                            if(userWishlistedBookIds){
+                                const index = userWishlistedBookIds.indexOf(parseInt(currentBookId));
+                                if (index > -1) userWishlistedBookIds.splice(index, 1);
+                            }
+                        }
+                    } else { showToastBrowse(data.message || 'Kļūda ar vēlmju sarakstu.', 'error'); }
+                })
+                .catch(error => showToastBrowse('Tīkla kļūda ar vēlmju sarakstu.', 'error'))
+                .finally(() => { wishlistBtn.disabled = false; });
+            });
             coverDiv.appendChild(wishlistBtn);
+            
             const infoDiv = document.createElement('div'); infoDiv.className = 'book-info';
             const titleH3 = document.createElement('h3'); titleH3.className = 'book-title'; titleH3.textContent = book.title || 'Nav nosaukuma';
             const authorP = document.createElement('p'); authorP.className = 'book-author'; authorP.textContent = book.author ? `by ${book.author}` : 'Nezināms autors';
@@ -387,6 +470,7 @@ try {
             bookElement.addEventListener('click', function() { window.location.href = `book.php?id=${book.id}`; });
             return bookElement;
         }
+
 
         if(searchInput) searchInput.addEventListener('input', function() { currentSearchTerm = this.value.toLowerCase(); displayBooks(); });
         if(searchInputMobile) searchInputMobile.addEventListener('input', function() { currentSearchTerm = this.value.toLowerCase(); displayBooks(); });
@@ -418,7 +502,36 @@ try {
                 displayBooks();
             });
         }
-        if (booksGrid) displayBooks();
+        if (booksGrid) displayBooks(); // Initial display
+
+        function showToastBrowse(message, type = 'success') {
+            const container = document.getElementById('toast-container-browse');
+            if (!container) { console.warn("Toast container for browse not found"); return; }
+
+            const toastDiv = document.createElement('div');
+            toastDiv.className = `toast show ${type === 'error' ? 'auth-error active' : ''}`;
+            toastDiv.style.backgroundColor = type === 'success' ? '#d4edda' : '#f8d7da';
+            toastDiv.style.color = type === 'success' ? '#155724' : '#721c24';
+            toastDiv.style.borderColor = type === 'success' ? '#c3e6cb' : '#f5c6cb';
+            toastDiv.style.padding = '15px'; 
+            toastDiv.style.borderRadius = '.25rem'; 
+            toastDiv.style.marginBottom = '10px';
+            toastDiv.style.position = 'relative'; // Relative to its container
+            
+            let iconSvg = type === 'success' ? 
+                '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>' :
+                '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+            
+            toastDiv.innerHTML = `
+                <div class="toast-content" style="display:flex; align-items:center;">
+                    <div class="toast-icon" style="margin-right:10px; color: ${type === 'success' ? '#155724' : '#721c24'};">${iconSvg}</div>
+                    <p class="toast-message" style="margin:0;">${message}</p>
+                </div>
+                <button class="toast-close" onclick="this.parentElement.remove()" style="background:none; border:none; font-size:1.2rem; line-height:1; color: ${type === 'success' ? '#155724' : '#721c24'}; position:absolute; top:50%; right:15px; transform:translateY(-50%);">×</button>`;
+            
+            container.appendChild(toastDiv); 
+            setTimeout(() => { toastDiv.remove(); }, 3000);
+        }
     });
     </script>
    <div id="chat-widget-container">
@@ -439,12 +552,10 @@ try {
         </div>
         <div id="chat-body">
             <div id="chat-conversation-list">
-                <!-- Conversations will be loaded here by JS -->
                 <div class="loading-spinner hidden"><div class="spinner"></div></div>
             </div>
             <div id="chat-message-area" class="hidden">
                 <div id="chat-messages-display">
-                    <!-- Messages will be loaded here by JS -->
                      <div class="loading-spinner hidden"><div class="spinner"></div></div>
                 </div>
                 <form id="chat-message-form">
@@ -459,7 +570,7 @@ try {
         </div>
     </div>
 </div>
-<link rel="stylesheet" href="chat.css?v=<?php echo time(); // Cache busting ?>">
-  <script src="chat.js?v=<?php echo time(); // Cache busting ?>"></script>
+<link rel="stylesheet" href="chat.css?v=<?php echo time(); ?>">
+  <script src="chat.js?v=<?php echo time(); ?>"></script>
   </body>
 </html>

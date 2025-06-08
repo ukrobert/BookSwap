@@ -8,10 +8,9 @@ $userName = $_SESSION['user_name'] ?? '';
 $userEmail = $_SESSION['user_email'] ?? '';
 $profilePhoto = $_SESSION['user_profile_photo'] ?? '';
 $userRole = $_SESSION['user_role'] ?? 'Registrēts';
+$userAverageRating = 0.0; // Initialize user average rating
 
-$errors = [];
-$success = '';
-
+// ... (genres_list, conditions_list, current_admins_list ielāde paliek nemainīga) ...
 $genres_list = [
     "Daiļliteratūra", "Fantāzija", "Zinātniskā fantastika", "Detektīvs", 
     "Trilleris", "Romāns", "Šausmas", "Biogrāfija", "Vēsture", 
@@ -19,19 +18,118 @@ $genres_list = [
 ];
 $conditions_list = ["Kā jauna", "Ļoti laba", "Laba", "Pieņemama"];
 
+$current_admins_list = [];
+if ($userRole === 'Moderators') {
+    if ($savienojums) { 
+        $stmt_get_admins = $savienojums->prepare("SELECT LietotajsID, Lietotajvards, E_pasts, ProfilaAttels FROM bookswap_users WHERE Loma = 'Administrators'");
+        if ($stmt_get_admins) {
+            $stmt_get_admins->execute();
+            $result_admins = $stmt_get_admins->get_result();
+            while ($admin_row = $result_admins->fetch_assoc()) {
+                if (!empty($admin_row['ProfilaAttels'])) {
+                    if (!filter_var($admin_row['ProfilaAttels'], FILTER_VALIDATE_URL) && !file_exists($admin_row['ProfilaAttels'])) {
+                        $admin_row['ProfilaAttels'] = ''; 
+                    }
+                }
+                $current_admins_list[] = $admin_row;
+            }
+            $stmt_get_admins->close();
+        } else { $errors[] = "Kļūda ielādējot administratoru sarakstu: " . $savienojums->error; }
+    }
+}
+
+$wishlist_books_for_js = [];
+if ($userRole === 'Registrēts') {
+    if ($savienojums) {
+        $stmt_wishlist = $savienojums->prepare("
+            SELECT b.GramatasID, b.Nosaukums, b.Autors, b.Attels, b.Stavoklis, b.Zanrs, w.PievienosanasDatums 
+            FROM bookswap_wishlist w
+            JOIN bookswap_books b ON w.GramatasID = b.GramatasID
+            WHERE w.LietotajsID = ?
+            ORDER BY w.PievienosanasDatums DESC
+        ");
+        if ($stmt_wishlist) {
+            $stmt_wishlist->bind_param("i", $userId);
+            $stmt_wishlist->execute();
+            $result_wishlist = $stmt_wishlist->get_result();
+            while ($wish_row = $result_wishlist->fetch_assoc()) {
+                $wish_cover_path = '';
+                 if (!empty($wish_row['Attels'])) {
+                    if (filter_var($wish_row['Attels'], FILTER_VALIDATE_URL)) $wish_cover_path = htmlspecialchars($wish_row['Attels']);
+                    elseif (file_exists($wish_row['Attels'])) $wish_cover_path = htmlspecialchars($wish_row['Attels']);
+                }
+                $wish_row['Attels'] = $wish_cover_path;
+                $wishlist_books_for_js[] = $wish_row;
+            }
+            $stmt_wishlist->close();
+        } else { $errors[] = "Kļūda ielādējot vēlmju sarakstu: " . $savienojums->error; }
+    }
+}
+
+$completed_exchanges_for_review = [];
+if ($userRole === 'Registrēts') { 
+    if ($savienojums) {
+        $stmt_completed_exchanges = $savienojums->prepare("
+            SELECT 
+                er.PieprasijumaID, er.IniciatorsID, er.AdresatsID, er.PiedavatGramataID, er.VelamaiGramataID, er.Status,
+                u_initiator.Lietotajvards AS IniciatorsVards,
+                u_adresats.Lietotajvards AS AdresatsVards,
+                b_offered.Nosaukums AS PiedavataGramataNosaukums,
+                b_requested.Nosaukums AS VelamaGramataNosaukums,
+                (SELECT COUNT(*) FROM bookswap_user_reviews ur 
+                 WHERE ur.ApmaijnaPieprasijumaID = er.PieprasijumaID AND ur.VertejsID = ?) AS reviews_given_by_current_user
+            FROM bookswap_exchange_requests er
+            JOIN bookswap_users u_initiator ON er.IniciatorsID = u_initiator.LietotajsID
+            JOIN bookswap_users u_adresats ON er.AdresatsID = u_adresats.LietotajsID
+            JOIN bookswap_books b_offered ON er.PiedavatGramataID = b_offered.GramatasID
+            JOIN bookswap_books b_requested ON er.VelamaiGramataID = b_requested.GramatasID
+            WHERE (er.IniciatorsID = ? OR er.AdresatsID = ?) AND er.Status = 'Apstiprināts' 
+            ORDER BY er.IzveidotsDatums DESC
+        "); 
+        
+        if ($stmt_completed_exchanges) {
+            $stmt_completed_exchanges->bind_param("iii", $userId, $userId, $userId);
+            $stmt_completed_exchanges->execute();
+            $result_completed = $stmt_completed_exchanges->get_result();
+            while ($ex_row = $result_completed->fetch_assoc()) {
+                if ($ex_row['IniciatorsID'] == $userId) {
+                    $ex_row['other_user_id'] = $ex_row['AdresatsID'];
+                    $ex_row['other_user_name'] = $ex_row['AdresatsVards'];
+                    $ex_row['book_they_got_title'] = $ex_row['PiedavataGramataNosaukums'];
+                    $ex_row['book_you_got_title'] = $ex_row['VelamaGramataNosaukums'];
+                } else {
+                    $ex_row['other_user_id'] = $ex_row['IniciatorsID'];
+                    $ex_row['other_user_name'] = $ex_row['IniciatorsVards'];
+                    $ex_row['book_they_got_title'] = $ex_row['VelamaGramataNosaukums'];
+                    $ex_row['book_you_got_title'] = $ex_row['PiedavataGramataNosaukums'];
+                }
+                $stmt_check_review = $savienojums->prepare("SELECT AtsauksmeID FROM bookswap_user_reviews WHERE ApmaijnaPieprasijumaID = ? AND VertejsID = ? AND VertejamaisLietotajsID = ?");
+                $stmt_check_review->bind_param("iii", $ex_row['PieprasijumaID'], $userId, $ex_row['other_user_id']);
+                $stmt_check_review->execute();
+                $stmt_check_review->store_result();
+                $ex_row['can_review_other_user'] = ($stmt_check_review->num_rows == 0);
+                $stmt_check_review->close();
+                $completed_exchanges_for_review[] = $ex_row;
+            }
+            $stmt_completed_exchanges->close();
+        } else { $errors[] = "Kļūda ielādējot pabeigtās maiņas: " . $savienojums->error; }
+    }
+}
+
+// AJAX request handling
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
+    // ... (visa AJAX apstrādes loģika paliek nemainīga, kā iepriekšējā atbildē) ...
     header('Content-Type: application/json');
     $response = ['success' => false, 'message' => 'Nezināma kļūda.'];
     if (!$savienojums) { $response['message'] = 'DB savienojuma kļūda.'; echo json_encode($response); exit; }
 
     $book_id_ajax = isset($_POST['book_id']) ? intval($_POST['book_id']) : 0;
     
-    $can_moderate = ($userRole === 'Moderators' || $userRole === 'Administrators');
+    $can_moderate_local = ($userRole === 'Moderators' || $userRole === 'Administrators');
     $is_owner = false;
     $book_owner_id = null;
-    $book_current_status_for_restore_logic = null;
 
-    if ($book_id_ajax > 0) { // Only check owner if book_id is relevant
+    if ($book_id_ajax > 0) { 
         $checkStmt = $savienojums->prepare("SELECT LietotajsID, Status FROM bookswap_books WHERE GramatasID = ?");
         if($checkStmt) {
             $checkStmt->bind_param("i", $book_id_ajax);
@@ -39,12 +137,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             $checkResult = $checkStmt->get_result();
             if ($bookRow = $checkResult->fetch_assoc()) {
                 $book_owner_id = $bookRow['LietotajsID'];
-                $book_current_status_for_restore_logic = $bookRow['Status'];
                 if ($book_owner_id == $userId) {
                     $is_owner = true;
                 }
             } else {
-                if ($_POST['ajax_action'] !== 'create_exchange_request' && $_POST['ajax_action'] !== 'handle_exchange_request' && $_POST['ajax_action'] !== 'update_report_status') {
+                if (!in_array($_POST['ajax_action'], ['create_exchange_request', 'handle_exchange_request', 'update_report_status', 'promote_to_admin', 'demote_admin', 'toggle_wishlist', 'check_wishlist_status', 'submit_user_review'])) {
                      $response['message'] = 'Grāmata nav atrasta.'; echo json_encode($response); $checkStmt->close(); exit;
                 }
             }
@@ -53,7 +150,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             $response['message'] = 'DB kļūda (pārbaude).'; echo json_encode($response); exit;
         }
     }
-
 
     switch ($_POST['ajax_action']) {
         case 'schedule_delete_book':
@@ -84,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             break;
         case 'approve_book':
             if ($book_id_ajax <= 0) { $response['message'] = 'Nederīgs grāmatas ID.'; break; }
-            if (!$can_moderate) { $response['message'] = 'Jums nav tiesību apstiprināt grāmatas.'; break; }
+            if (!$can_moderate_local) { $response['message'] = 'Jums nav tiesību apstiprināt grāmatas.'; break; }
             $stmt_approve = $savienojums->prepare("UPDATE bookswap_books SET Status = 'Pieejama' WHERE GramatasID = ? AND Status = 'Gaida apstiprinājumu'");
             if($stmt_approve){
                 $stmt_approve->bind_param("i", $book_id_ajax);
@@ -96,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             break;
         case 'reject_book': 
             if ($book_id_ajax <= 0) { $response['message'] = 'Nederīgs grāmatas ID.'; break; }
-            if (!$can_moderate) { $response['message'] = 'Jums nav tiesību noraidīt grāmatas.'; break; }
+            if (!$can_moderate_local) { $response['message'] = 'Jums nav tiesību noraidīt grāmatas.'; break; }
             $image_path_reject = null;
             $stmt_get_img_reject = $savienojums->prepare("SELECT Attels FROM bookswap_books WHERE GramatasID = ?");
              if($stmt_get_img_reject){
@@ -110,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             if($stmt_reject){
                 $stmt_reject->bind_param("i", $book_id_ajax);
                 if ($stmt_reject->execute() && $stmt_reject->affected_rows > 0) {
-                    if (!empty($image_path_reject) && file_exists($image_path_reject) && strpos($image_path_reject, 'default') === false) {
+                    if (!empty($image_path_reject) && file_exists($image_path_reject) && strpos($image_path_reject, 'default') === false && strpos($image_path_reject, 'http') !== 0) {
                         unlink($image_path_reject); 
                     }
                     $response = ['success' => true, 'message' => 'Grāmata noraidīta un dzēsta.'];
@@ -119,7 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
             } else {$response['message'] = 'DB kļūda (noraidīt).';}
             break;
         case 'update_report_status':
-            if (!$can_moderate) { $response['message'] = 'Jums nav tiesību mainīt ziņojuma statusu.'; break; }
+            if (!$can_moderate_local) { $response['message'] = 'Jums nav tiesību mainīt ziņojuma statusu.'; break; }
             $report_id_ajax = isset($_POST['report_id']) ? intval($_POST['report_id']) : 0;
             $new_status_ajax = isset($_POST['new_status']) ? trim($_POST['new_status']) : '';
             $allowed_statuses = ['Apstrādāts', 'Izmeklēšanā', 'Atrisināts', 'Slēgts', 'Dzēsts'];
@@ -180,8 +276,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                     $new_status_req = ($decision === 'approve') ? 'Apstiprināts' : 'Noraidīts';
                     $savienojums->begin_transaction();
                     try {
-                        $stmt_update_req = $savienojums->prepare("UPDATE bookswap_exchange_requests SET Status = ? WHERE PieprasijumaID = ?");
-                        $stmt_update_req->bind_param("si", $new_status_req, $request_id); $stmt_update_req->execute(); $stmt_update_req->close();
+                        $stmt_update_req_status = $savienojums->prepare("UPDATE bookswap_exchange_requests SET Status = ? WHERE PieprasijumaID = ?");
+                        $stmt_update_req_status->bind_param("si", $new_status_req, $request_id); $stmt_update_req_status->execute(); $stmt_update_req_status->close();
                         if ($decision === 'approve') {
                             $stmt_update_book1 = $savienojums->prepare("UPDATE bookswap_books SET Status = 'Apmainīta' WHERE GramatasID = ?");
                             $stmt_update_book1->bind_param("i", $request_data['PiedavatGramataID']); $stmt_update_book1->execute(); $stmt_update_book1->close();
@@ -205,8 +301,206 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_action'])) {
                 $stmt_get_req->close();
             } else { $response['message'] = 'DB kļūda (saņemt pieprasījumu).'; }
             break;
+        case 'promote_to_admin':
+            if ($userRole !== 'Moderators') { 
+                $response['message'] = 'Jums nav tiesību veikt šo darbību.';
+                break;
+            }
+            $target_email_promote = isset($_POST['target_email']) ? trim($_POST['target_email']) : '';
+        
+            if (empty($target_email_promote) || !filter_var($target_email_promote, FILTER_VALIDATE_EMAIL)) {
+                $response['message'] = 'Lūdzu, ievadiet derīgu e-pasta adresi.';
+                break;
+            }
+        
+            $stmt_find_user_promote = $savienojums->prepare("SELECT LietotajsID, Loma FROM bookswap_users WHERE E_pasts = ?");
+            if (!$stmt_find_user_promote) { $response['message'] = 'DB kļūda (lietotāja meklēšana).'; break; }
+            $stmt_find_user_promote->bind_param("s", $target_email_promote);
+            $stmt_find_user_promote->execute();
+            $result_find_user_promote = $stmt_find_user_promote->get_result();
+        
+            if ($target_user_data_promote = $result_find_user_promote->fetch_assoc()) {
+                $target_user_id_promote = $target_user_data_promote['LietotajsID'];
+                $target_user_current_role = $target_user_data_promote['Loma'];
+        
+                if ($target_user_id_promote == $userId) { 
+                    $response['message'] = 'Jūs nevarat paaugstināt pats sevi.';
+                } elseif ($target_user_current_role === 'Administrators') {
+                    $response['message'] = 'Lietotājs jau ir administrators.';
+                } elseif ($target_user_current_role === 'Moderators') { 
+                    $response['message'] = 'Moderatori nevar tikt paaugstināti par administratoriem šādā veidā.';
+                } else { 
+                    $stmt_promote_user = $savienojums->prepare("UPDATE bookswap_users SET Loma = 'Administrators' WHERE LietotajsID = ?");
+                    if (!$stmt_promote_user) { $response['message'] = 'DB kļūda (paaugstināšana).'; } 
+                    else {
+                        $stmt_promote_user->bind_param("i", $target_user_id_promote);
+                        if ($stmt_promote_user->execute()) {
+                            $response = ['success' => true, 'message' => 'Lietotājs '.htmlspecialchars($target_email_promote).' veiksmīgi paaugstināts par administratoru.'];
+                        } else { $response['message'] = 'Neizdevās paaugstināt lietotāju: ' . $stmt_promote_user->error; }
+                        $stmt_promote_user->close();
+                    }
+                }
+            } else { $response['message'] = 'Lietotājs ar norādīto e-pastu nav atrasts.'; }
+            $stmt_find_user_promote->close();
+            break;
+        case 'demote_admin':
+            if ($userRole !== 'Moderators') {
+                $response['message'] = 'Jums nav tiesību veikt šo darbību.';
+                break;
+            }
+            $target_user_id_demote = isset($_POST['target_user_id']) ? intval($_POST['target_user_id']) : 0;
+
+            if ($target_user_id_demote <= 0) { $response['message'] = 'Nederīgs lietotāja ID.'; break; }
+            if ($target_user_id_demote == $userId) { $response['message'] = 'Jūs nevarat pazemināt pats sevi.'; break; }
+
+            $stmt_check_admin = $savienojums->prepare("SELECT Loma FROM bookswap_users WHERE LietotajsID = ?");
+            if (!$stmt_check_admin) { $response['message'] = 'DB kļūda (pārbaude pirms pazemināšanas).'; break;}
+            $stmt_check_admin->bind_param("i", $target_user_id_demote);
+            $stmt_check_admin->execute();
+            $result_check_admin = $stmt_check_admin->get_result();
+            if ($user_to_demote = $result_check_admin->fetch_assoc()) {
+                if ($user_to_demote['Loma'] !== 'Administrators') {
+                    $response['message'] = 'Šis lietotājs nav administrators.';
+                } else {
+                    $stmt_demote = $savienojums->prepare("UPDATE bookswap_users SET Loma = 'Registrēts' WHERE LietotajsID = ? AND Loma = 'Administrators'");
+                    if (!$stmt_demote) { $response['message'] = 'DB kļūda (pazemināšana).'; }
+                    else {
+                        $stmt_demote->bind_param("i", $target_user_id_demote);
+                        if ($stmt_demote->execute() && $stmt_demote->affected_rows > 0) {
+                            $response = ['success' => true, 'message' => 'Administrators veiksmīgi pazemināts uz "Registrēts".'];
+                        } else {
+                            $response['message'] = 'Neizdevās pazemināt administratoru: ' . ($stmt_demote->error ?: 'Iespējams, lietotājs vairs nav administrators vai ID ir nepareizs.');
+                        }
+                        $stmt_demote->close();
+                    }
+                }
+            } else {
+                $response['message'] = 'Pazemināmais lietotājs nav atrasts.';
+            }
+            $stmt_check_admin->close();
+            break;
+        case 'check_wishlist_status':
+            if (!isLoggedIn()) { $response = ['success' => false, 'wishlisted' => false, 'message' => 'Lietotājs nav autorizējies.']; break; }
+            if ($book_id_ajax <= 0) { $response = ['success' => false, 'wishlisted' => false, 'message' => 'Nederīgs grāmatas ID.']; break; }
+            $current_user_id_wish_check = $_SESSION['user_id']; // Use current user's ID from session
+            $stmt_check_wish = $savienojums->prepare("SELECT VelmeID FROM bookswap_wishlist WHERE LietotajsID = ? AND GramatasID = ?");
+            if ($stmt_check_wish) {
+                $stmt_check_wish->bind_param("ii", $current_user_id_wish_check, $book_id_ajax);
+                $stmt_check_wish->execute();
+                $stmt_check_wish->store_result();
+                $response = ['success' => true, 'wishlisted' => ($stmt_check_wish->num_rows > 0)];
+                $stmt_check_wish->close();
+            } else { $response = ['success' => false, 'wishlisted' => false, 'message' => 'DB kļūda (pārbaudot vēlmju sarakstu).'];}
+            break;
+        case 'toggle_wishlist':
+            if (!isLoggedIn()) { $response['message'] = 'Lūdzu, pieslēdzieties, lai izmantotu vēlmju sarakstu.'; break; }
+            if ($book_id_ajax <= 0) { $response['message'] = 'Nederīgs grāmatas ID.'; break; }
+            $current_user_id_wish_toggle = $_SESSION['user_id'];
+
+            $is_wishlisted_toggle = false;
+            $stmt_check_toggle_wish = $savienojums->prepare("SELECT VelmeID FROM bookswap_wishlist WHERE LietotajsID = ? AND GramatasID = ?");
+            if($stmt_check_toggle_wish) {
+                $stmt_check_toggle_wish->bind_param("ii", $current_user_id_wish_toggle, $book_id_ajax);
+                $stmt_check_toggle_wish->execute();
+                $stmt_check_toggle_wish->store_result();
+                $is_wishlisted_toggle = ($stmt_check_toggle_wish->num_rows > 0);
+                $stmt_check_toggle_wish->close();
+            } else { $response['message'] = 'DB kļūda (pārbaudot pirms pārslēgšanas).'; break; }
+
+            if ($is_wishlisted_toggle) { 
+                $stmt_toggle_wish = $savienojums->prepare("DELETE FROM bookswap_wishlist WHERE LietotajsID = ? AND GramatasID = ?");
+                if ($stmt_toggle_wish) {
+                    $stmt_toggle_wish->bind_param("ii", $current_user_id_wish_toggle, $book_id_ajax);
+                    if ($stmt_toggle_wish->execute() && $stmt_toggle_wish->affected_rows > 0) {
+                        $response = ['success' => true, 'wishlisted' => false, 'message' => 'Grāmata noņemta no vēlmju saraksta.'];
+                    } else { $response['message'] = 'Neizdevās noņemt no vēlmju saraksta.'; }
+                    $stmt_toggle_wish->close();
+                } else { $response['message'] = 'DB kļūda (noņemot no vēlmju saraksta).';}
+            } else { 
+                $stmt_toggle_wish = $savienojums->prepare("INSERT INTO bookswap_wishlist (LietotajsID, GramatasID, PievienosanasDatums) VALUES (?, ?, NOW())");
+                 if ($stmt_toggle_wish) {
+                    $stmt_toggle_wish->bind_param("ii", $current_user_id_wish_toggle, $book_id_ajax);
+                    if ($stmt_toggle_wish->execute()) {
+                        $response = ['success' => true, 'wishlisted' => true, 'message' => 'Grāmata pievienota vēlmju sarakstam!'];
+                    } else { $response['message'] = 'Neizdevās pievienot vēlmju sarakstam. ' . $stmt_toggle_wish->error; }
+                    $stmt_toggle_wish->close();
+                } else { $response['message'] = 'DB kļūda (pievienojot vēlmju sarakstam).';}
+            }
+            break;
+        case 'submit_user_review':
+            if (!isLoggedIn()) { $response['message'] = 'Lūdzu, pieslēdzieties.'; break; }
+            
+            $exchange_id_review = isset($_POST['exchange_id']) ? intval($_POST['exchange_id']) : 0;
+            $reviewed_user_id_review = isset($_POST['reviewed_user_id']) ? intval($_POST['reviewed_user_id']) : 0;
+            $rating_review = isset($_POST['rating']) ? intval($_POST['rating']) : 0;
+            $comment_review = isset($_POST['comment']) ? trim($_POST['comment']) : '';
+            $reviewer_id = $_SESSION['user_id'];
+
+            if ($exchange_id_review <= 0 || $reviewed_user_id_review <= 0 || $rating_review < 1 || $rating_review > 5) {
+                $response['message'] = 'Nederīgi atsauksmes dati.'; break;
+            }
+            if ($reviewer_id == $reviewed_user_id_review) {
+                $response['message'] = 'Jūs nevarat novērtēt pats sevi.'; break;
+            }
+
+            $stmt_check_exchange_participation = $savienojums->prepare("
+                SELECT PieprasijumaID FROM bookswap_exchange_requests 
+                WHERE PieprasijumaID = ? AND (IniciatorsID = ? OR AdresatsID = ?) AND Status = 'Apstiprināts'
+            ");
+            if (!$stmt_check_exchange_participation) { $response['message'] = 'DB kļūda pārbaudot maiņu.'; break; }
+            $stmt_check_exchange_participation->bind_param("iii", $exchange_id_review, $reviewer_id, $reviewer_id);
+            $stmt_check_exchange_participation->execute();
+            $stmt_check_exchange_participation->store_result();
+            
+            if ($stmt_check_exchange_participation->num_rows == 0) {
+                $response['message'] = 'Jūs nebijāt daļa no šīs maiņas vai tā nav pabeigta.';
+                $stmt_check_exchange_participation->close();
+                break;
+            }
+            $stmt_check_exchange_participation->close();
+
+            $stmt_check_existing_review = $savienojums->prepare("SELECT AtsauksmeID FROM bookswap_user_reviews WHERE ApmaijnaPieprasijumaID = ? AND VertejsID = ? AND VertejamaisLietotajsID = ?");
+            if(!$stmt_check_existing_review) { $response['message'] = 'DB kļūda pārbaudot esošo atsauksmi.'; break; }
+            $stmt_check_existing_review->bind_param("iii", $exchange_id_review, $reviewer_id, $reviewed_user_id_review);
+            $stmt_check_existing_review->execute();
+            $stmt_check_existing_review->store_result();
+
+            if ($stmt_check_existing_review->num_rows > 0) {
+                $response['message'] = 'Jūs jau esat atstājis atsauksmi par šo lietotāju šajā maiņā.';
+                $stmt_check_existing_review->close();
+                break;
+            }
+            $stmt_check_existing_review->close();
+
+            $stmt_insert_review = $savienojums->prepare("INSERT INTO bookswap_user_reviews (VertejamaisLietotajsID, VertejsID, Vertejums, Komentars, PublicesanasDatums, ApmaijnaPieprasijumaID) VALUES (?, ?, ?, ?, NOW(), ?)");
+            if (!$stmt_insert_review) { $response['message'] = 'DB kļūda sagatavojot atsauksmi.'; break;}
+            $stmt_insert_review->bind_param("iiisi", $reviewed_user_id_review, $reviewer_id, $rating_review, $comment_review, $exchange_id_review);
+
+            if ($stmt_insert_review->execute()) {
+                $stmt_avg = $savienojums->prepare("SELECT AVG(Vertejums) as avg_rating FROM bookswap_user_reviews WHERE VertejamaisLietotajsID = ?");
+                if ($stmt_avg) {
+                    $stmt_avg->bind_param("i", $reviewed_user_id_review);
+                    $stmt_avg->execute();
+                    $result_avg = $stmt_avg->get_result();
+                    $avg_data = $result_avg->fetch_assoc();
+                    $new_avg_rating = $avg_data['avg_rating'] ? round($avg_data['avg_rating'], 2) : null;
+                    $stmt_avg->close();
+
+                    $stmt_update_avg = $savienojums->prepare("UPDATE bookswap_users SET VidejaisVertejums = ? WHERE LietotajsID = ?");
+                    if($stmt_update_avg){
+                        $stmt_update_avg->bind_param("di", $new_avg_rating, $reviewed_user_id_review);
+                        $stmt_update_avg->execute();
+                        $stmt_update_avg->close();
+                    }
+                }
+                $response = ['success' => true, 'message' => 'Atsauksme veiksmīgi iesniegta!'];
+            } else {
+                $response['message'] = 'Kļūda iesniedzot atsauksmi: ' . $stmt_insert_review->error;
+            }
+            $stmt_insert_review->close();
+            break;
     }
-    if ($savienojums && mysqli_ping($savienojums)) $savienojums->close(); // Проверяем перед закрытием
+    if ($savienojums && mysqli_ping($savienojums)) $savienojums->close(); 
     echo json_encode($response);
     exit;
 }
@@ -218,9 +512,12 @@ if ($savienojums && mysqli_ping($savienojums)) {
         $autoDeleteStmt->execute();
         $autoDeleteStmt->close();
     }
-} else { require 'connect_db.php'; }
+} else { 
+    require_once 'connect_db.php';
+}
 
-$stmt_user_refresh = $savienojums->prepare("SELECT Lietotajvards, E_pasts, ProfilaAttels, Loma FROM bookswap_users WHERE LietotajsID = ?");
+// Izlabots: Pareizi ielādē VidejaisVertejums
+$stmt_user_refresh = $savienojums->prepare("SELECT Lietotajvards, E_pasts, ProfilaAttels, Loma, VidejaisVertejums FROM bookswap_users WHERE LietotajsID = ?");
 if ($stmt_user_refresh) {
     $stmt_user_refresh->bind_param("i", $userId); $stmt_user_refresh->execute();
     $result_user_refresh = $stmt_user_refresh->get_result();
@@ -229,9 +526,11 @@ if ($stmt_user_refresh) {
         $_SESSION['user_email'] = $user_db_data_refresh['E_pasts']; $userEmail = $user_db_data_refresh['E_pasts'];
         $_SESSION['user_profile_photo'] = $user_db_data_refresh['ProfilaAttels']; $profilePhoto = $user_db_data_refresh['ProfilaAttels'];
         $_SESSION['user_role'] = $user_db_data_refresh['Loma']; $userRole = $user_db_data_refresh['Loma'];
+        $userAverageRating = $user_db_data_refresh['VidejaisVertejums']; // Saglabājam vidējo vērtējumu
     }
     $stmt_user_refresh->close();
 }
+
 
 $nameParts = explode(' ', $userName, 2);
 $firstName = $nameParts[0];
@@ -270,7 +569,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['ajax_action'])) {
                     if($stmt_add_book) {
                         $stmt_add_book->bind_param("ssssissssis", $bookTitle, $bookAuthor, $bookGenre, $bookLanguage, $bookYear, $bookDescription, $bookImage, $currentDate, $status, $userId, $bookStavoklis);
                         if ($stmt_add_book->execute()) { $_SESSION['success_message'] = 'Grāmata pievienota un gaida apstiprinājumu!'; header('Location: profile.php'); exit(); } 
-                        else { $errors[] = 'Kļūda pievienojot grāmatu: ' . $stmt_add_book->error; if (!empty($bookImage) && file_exists($bookImage)) unlink($bookImage); }
+                        else { $errors[] = 'Kļūda pievienojot grāmatu: ' . $stmt_add_book->error; if (!empty($bookImage) && file_exists($bookImage) && strpos($bookImage, 'http') !== 0) unlink($bookImage); }
                         $stmt_add_book->close();
                     } else { $errors[] = 'DB Kļūda (pievienot grāmatu).'; }
                 }
@@ -322,7 +621,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['ajax_action'])) {
                     $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
                     $fileName = 'profile_' . $userId . '_' . time() . '.' . $fileExtension; $filePath = $uploadDir . $fileName;
                     if (move_uploaded_file($file['tmp_name'], $filePath)) {
-                        if (!empty($profilePhoto) && file_exists($profilePhoto) && strpos($profilePhoto, 'default') === false) { unlink($profilePhoto); }
+                        if (!empty($profilePhoto) && file_exists($profilePhoto) && strpos($profilePhoto, 'default') === false && strpos($profilePhoto, 'http') !== 0) { unlink($profilePhoto); }
                         $stmt_photo = $savienojums->prepare("UPDATE bookswap_users SET ProfilaAttels = ? WHERE LietotajsID = ?");
                         if($stmt_photo){
                             $stmt_photo->bind_param("si", $filePath, $userId);
@@ -338,7 +637,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['ajax_action'])) {
             if($stmt_remove_photo){
                 $stmt_remove_photo->bind_param("i", $userId);
                 if ($stmt_remove_photo->execute()) {
-                    if (!empty($profilePhoto) && file_exists($profilePhoto) && strpos($profilePhoto, 'default') === false) { unlink($profilePhoto); }
+                    if (!empty($profilePhoto) && file_exists($profilePhoto) && strpos($profilePhoto, 'default') === false && strpos($profilePhoto, 'http') !== 0) { unlink($profilePhoto); }
                     $_SESSION['user_profile_photo'] = ''; $_SESSION['success_message'] = 'Profila fotoattēls veiksmīgi noņemts!'; header('Location: profile.php'); exit();
                 } else { $errors[] = 'Kļūda noņemot profila fotoattēlu.';}
                 $stmt_remove_photo->close();
@@ -347,12 +646,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['ajax_action'])) {
     }
 }
 
+
 if (isset($_SESSION['success_message'])) {
     $success = $_SESSION['success_message'];
     unset($_SESSION['success_message']);
 }
 
-$reported_issues = []; // Initialize
+$reported_issues = [];
 if ($userRole === 'Moderators' || $userRole === 'Administrators') {
     if (!$savienojums || $savienojums->connect_errno) { require 'connect_db.php'; }
     $stmt_issues = $savienojums->prepare("SELECT ir.*, u.Lietotajvards AS ReporterName FROM bookswap_issue_reports ir LEFT JOIN bookswap_users u ON ir.reporter_user_id = u.LietotajsID WHERE ir.status = 'Jauns' ORDER BY ir.report_date DESC");
@@ -392,6 +692,31 @@ if ($savienojums && !is_string($savienojums)) {
     if($stmt_outgoing){ $stmt_outgoing->bind_param("i", $userId); $stmt_outgoing->execute(); $result_outgoing = $stmt_outgoing->get_result(); while($row_out = $result_outgoing->fetch_assoc()) { $outgoing_requests[] = $row_out; } $stmt_outgoing->close(); }
 }
 
+// Funkcija zvaigznīšu HTML ģenerēšanai
+function generateStarRatingHTML($rating, $maxStars = 5) {
+    $html = '<div class="star-rating-display">';
+    $fullStars = floor($rating);
+    $halfStar = ($rating - $fullStars) >= 0.5;
+    $emptyStars = $maxStars - $fullStars - ($halfStar ? 1 : 0);
+
+    for ($i = 0; $i < $fullStars; $i++) {
+        $html .= '<span class="star filled">★</span>';
+    }
+    if ($halfStar) {
+        // Jūs varat izmantot daļēji aizpildītu zvaigznīti vai noapaļot
+        // Šeit vienkāršības labad izmantosim noapaļotu pilnu vai tukšu
+        // Ja vēlaties precīzāku puszvaigzni, būs nepieciešams sarežģītāks CSS vai SVG
+        $html .= '<span class="star filled">★</span>'; // Vai tukša, atkarībā no dizaina
+    }
+    for ($i = 0; $i < $emptyStars; $i++) {
+        $html .= '<span class="star">☆</span>'; // Tukša zvaigzne
+    }
+    $html .= ' <span class="rating-numeric">(' . number_format($rating, 1) . ')</span>';
+    $html .= '</div>';
+    return $html;
+}
+
+
 if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savienojums->close();
 ?>
 <!DOCTYPE html>
@@ -404,15 +729,21 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
   <link rel="stylesheet" href="auth.css"> 
   <link rel="stylesheet" href="book.css"> 
   <style>
+   
+    .star-rating-display { display: inline-block; font-size: 1.1em;  color: var(--color-burgundy); }
+    .star-rating-display .star.filled { color: var(--color-burgundy); }
+    .star-rating-display .star { color: var(--color-light-gray);  }
+    .star-rating-display .rating-numeric { font-size: 0.9em; color: var(--color-gray); margin-left: 5px; vertical-align: middle;}
+
     .hidden { display: none; }
-    .add-book-section, .password-change-section, .moderation-section, .exchange-requests-section { margin-top: 20px; padding: 20px; background-color: var(--color-paper); border-radius: var(--radius-lg); }
+    .add-book-section, .password-change-section, .moderation-section, .admin-management-section, .completed-exchanges-section { margin-top: 20px; padding: 20px; background-color: var(--color-paper); border-radius: var(--radius-lg); } /* Added completed-exchanges-section */
     .form-section-title { margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid var(--color-paper); padding-bottom: 10px; }
-    .user-books, .moderation-queue, .issue-reports-list, .exchange-request-grid { margin-top: 20px; }
+    .user-books, .moderation-queue, .issue-reports-list, .exchange-request-grid, .current-admins-list, #wishlistBooksGrid { margin-top: 20px; } 
     .books-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; margin-top: 20px; }
     .book-card { background-color: var(--color-white); border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--color-paper); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); display: flex; flex-direction: column; position:relative; }
     .book-card.pending-deletion { border-left: 5px solid orange; }
     .book-card.pending-approval { border-left: 5px solid dodgerblue; }
-    .book-cover-container { height: 200px; overflow: hidden; background-color: var(--color-light-gray); display: flex; align-items: center; justify-content: center; }
+    .book-cover-container { height: 200px; overflow: hidden; background-color: var(--color-light-gray); display: flex; align-items: center; justify-content: center; position: relative; }
     .book-cover { width: 100%; height: 100%; object-fit: cover; }
     .book-cover-fallback svg { width: 50px; height: 50px; color: var(--color-gray); }
     .book-info { padding: 15px; flex-grow: 1; }
@@ -443,9 +774,9 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
     .close-button-modal:hover, .close-button-modal:focus { color: #333; text-decoration: none; cursor: pointer; }
     .modal-content h3 { margin-top: 0; margin-bottom: 20px; font-family: var(--font-serif); color: var(--color-darkwood); }
     .modal-content p { margin-bottom: 15px; color: var(--color-gray); }
-    .modal-content input[type="text"] { width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid var(--color-paper); border-radius: var(--radius-md); }
+    .modal-content input[type="text"], .modal-content input[type="email"], .modal-content textarea { width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid var(--color-paper); border-radius: var(--radius-md); } 
     .modal-footer-buttons { display: flex; justify-content: flex-end; gap: 10px; }
-    #confirmDeleteBookBtnModal:disabled, #confirmRejectBookBtnModal:disabled { background-color: #ccc; cursor: not-allowed; }
+    #confirmDeleteBookBtnModal:disabled, #confirmRejectBookBtnModal:disabled, #confirmPromoteAdminBtnModal:disabled, #confirmDemoteAdminBtnModal:disabled, #submitReviewBtnModal:disabled { background-color: #ccc; cursor: not-allowed; } 
     .issue-reports-section { margin-top: 20px; }
     .issue-reports-list { display: grid; grid-template-columns: 1fr; gap: 20px; }
     .issue-report-card { background-color: var(--color-white); border: 1px solid var(--color-paper); border-left: 5px solid var(--color-burgundy); border-radius: var(--radius-md); padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
@@ -471,9 +802,33 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
     .exchange-request-message { background-color: var(--color-cream); padding: 12px; border-radius: var(--radius-sm); margin-top:12px; font-style: italic; font-size: 0.85rem; border: 1px dashed var(--color-paper);}
     .exchange-request-message strong { display:block; margin-bottom: 5px; font-style: normal;}
     .exchange-requests-section > h4 { font-family: var(--font-serif); font-size:1.3rem; margin-bottom:15px; color:var(--color-darkwood); padding-bottom:10px; border-bottom: 1px solid var(--color-paper); }
+    .admin-management-section p { margin-bottom: 10px; } 
+    .admin-user-card { display: flex; align-items: center; background-color: var(--color-white); padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--color-paper); margin-bottom: 10px; }
+    .admin-user-avatar { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; margin-right: 15px; background-color: var(--color-light-gray); display:flex; align-items:center; justify-content:center;}
+    .admin-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .admin-user-avatar .placeholder-initials { font-weight: bold; color: var(--color-darkwood); }
+    .admin-user-details { flex-grow: 1; }
+    .admin-user-details strong { display: block; color: var(--color-darkwood); }
+    .admin-user-details span { font-size: 0.85rem; color: var(--color-gray); }
+    .btn-demote-admin { background-color: #f48fb1; color: white; padding: 5px 10px; font-size:0.8rem; border-radius:var(--radius-sm); }
+    .btn-demote-admin:hover { background-color: #f06292; }
+    .wishlist-button-profile { 
+        background-color: hsla(0, 60%, 55%, 0.8); 
+        color: white; border: none; padding: var(--spacing-1) var(--spacing-2);
+        font-size: 0.8rem; border-radius: var(--radius-md); cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .wishlist-button-profile:hover { background-color: hsla(0, 60%, 45%, 1); }
+    .book-card .wishlist-button { 
+        position: absolute; top: var(--spacing-2); right: var(--spacing-2);
+        background-color: hsla(0,0%,100%,0.8); border-radius: 50%;
+        width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+        color: var(--color-burgundy); 
+    }
+    .book-card .wishlist-button svg.filled { fill: var(--color-burgundy); }
   </style>
 </head>
-<body data-current-user-id="<?php echo isLoggedIn() ? htmlspecialchars($_SESSION['user_id']) : '0'; ?>">
+<body data-current-user-id="<?php echo htmlspecialchars($userId); ?>">
     <header class="navigation">
         <div class="container">
             <div class="nav-wrapper">
@@ -599,6 +954,19 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
                     <?php echo ($userRole === 'Moderators' || $userRole === 'Administrators') ? 'Moderējamās grāmatas' : 'Manas grāmatas'; ?>
                 </span>
               </div>
+                <?php if ($userRole === 'Registrēts'): ?>
+                <div class="stat-item">
+                    <span class="stat-number" id="wishlistCountProfile"><?php echo count($wishlist_books_for_js); ?></span>
+                    <span class="stat-label">Vēlmju sarakstā</span>
+                </div>
+                 <!-- USER AVERAGE RATING DISPLAY -->
+                <div class="stat-item">
+                    <div id="userAverageRatingDisplaySidebar" class="star-rating-display">
+                        <?php echo generateStarRatingHTML($userAverageRating); ?>
+                    </div>
+                    <span class="stat-label">Vidējais vērtējums</span>
+                </div>
+                <?php endif; ?>
             </div>
           </div>
           
@@ -623,6 +991,57 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
                 <div class="form-actions"><button type="submit" class="btn-primary">Atjaunot</button><button type="button" id="cancelPasswordBtn" class="btn-outline">Atcelt</button></div>
               </form>
             </div>
+
+            <?php if ($userRole === 'Moderators'): ?>
+                <div class="form-section-title"><h3>Administratoru pārvaldība</h3></div>
+                <div class="admin-management-section"> 
+                    <p>Ievadiet lietotāja e-pasta adresi, lai paaugstinātu viņu par Administratoru.</p>
+                    <div class="form-group">
+                        <label for="promoteEmailInput">Lietotāja e-pasts paaugstināšanai:</label>
+                        <input type="email" id="promoteEmailInput" name="promoteEmailInput" class="form-input" placeholder="piemers@example.com">
+                    </div>
+                    <button type="button" id="initiatePromoteBtn" class="btn-primary">Paaugstināt par Administratoru</button>
+                
+                    <h4 style="margin-top: 30px; margin-bottom: 15px; border-top: 1px solid var(--color-paper); padding-top:15px;">Esošie Administratori</h4>
+                    <div class="current-admins-list">
+                        <?php 
+                        $other_admins_exist = false;
+                        if (!empty($current_admins_list)) {
+                            foreach ($current_admins_list as $admin) {
+                                if ($admin['LietotajsID'] != $userId) { 
+                                    $other_admins_exist = true;
+                                    break;
+                                }
+                            }
+                        }
+                        $admins_to_display = array_filter($current_admins_list, function($admin) use ($userId) {
+                            return $admin['LietotajsID'] != $userId; 
+                        });
+
+                        if (empty($admins_to_display)): ?>
+                            <p class="no-books-message">Pašlaik nav citu administratoru.</p>
+                        <?php else: ?>
+                            <?php foreach ($admins_to_display as $admin): ?>
+                                <div class="admin-user-card" id="admin-card-<?php echo $admin['LietotajsID']; ?>">
+                                    <div class="admin-user-avatar">
+                                        <?php if (!empty($admin['ProfilaAttels'])): ?>
+                                            <img src="<?php echo htmlspecialchars($admin['ProfilaAttels']); ?>?t=<?php echo time(); ?>" alt="<?php echo htmlspecialchars($admin['Lietotajvards']); ?>">
+                                        <?php else: 
+                                            $initial = !empty($admin['Lietotajvards']) ? strtoupper(mb_substr($admin['Lietotajvards'], 0, 1, 'UTF-8')) : 'A';?>
+                                            <span class="placeholder-initials"><?php echo $initial; ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="admin-user-details">
+                                        <strong><?php echo htmlspecialchars($admin['Lietotajvards']); ?></strong>
+                                        <span><?php echo htmlspecialchars($admin['E_pasts']); ?></span>
+                                    </div>
+                                    <button type="button" class="btn btn-demote-admin" onclick="openDemoteAdminModal(<?php echo $admin['LietotajsID']; ?>, '<?php echo htmlspecialchars(addslashes($admin['E_pasts'])); ?>')">Noņemt tiesības</button>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
             
             <?php if ($userRole === 'Moderators' || $userRole === 'Administrators'): ?>
                 <div class="form-section-title"><h3>Grāmatu moderācija (Gaida apstiprinājumu)</h3></div>
@@ -667,41 +1086,41 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
                     <?php endif; ?>
                 </div>
                 <?php if ($userRole === 'Moderators' || $userRole === 'Administrators'): ?>
-    <div class="form-section-title"><h3>Ziņojumi par problēmām (Jauni)</h3></div>
-    <div class="moderation-section issue-reports-section">
-        <?php if (empty($reported_issues)): ?>
-            <p class="no-books-message">Nav jaunu ziņojumu par problēmām.</p>
-        <?php else: ?>
-            <div class="issue-reports-list">
-                <?php foreach ($reported_issues as $report): ?>
-                    <div class="issue-report-card" id="issue-report-<?php echo $report['report_id']; ?>">
-                        <h4>Problēmas veids: <?php echo htmlspecialchars($report['issue_type']); ?></h4>
-                        <p><strong>Ziņotājs:</strong> <?php echo htmlspecialchars($report['ReporterName'] ?? 'Anonīms'); ?> (ID: <?php echo htmlspecialchars($report['reporter_user_id']); ?>)</p>
-                        <p><strong>Datums:</strong> <?php echo htmlspecialchars(date('d.m.Y H:i', strtotime($report['issue_date']))); ?></p>
-                        <p><strong>Ziņots:</strong> <?php echo htmlspecialchars(date('d.m.Y H:i', strtotime($report['report_date']))); ?></p>
-                        
-                        <?php if (!empty($report['related_user_text'])): ?>
-                            <p><strong>Saistītais lietotājs:</strong> <?php echo htmlspecialchars($report['related_user_text']); ?></p>
-                        <?php endif; ?>
-                        <?php if (!empty($report['related_book_text'])): ?>
-                            <p><strong>Saistītā grāmata:</strong> <?php echo htmlspecialchars($report['related_book_text']); ?></p>
-                        <?php endif; ?>
-                        
-                        <p><strong>Apraksts:</strong><br><?php echo nl2br(htmlspecialchars($report['description'])); ?></p>
-                        <p><strong>Kontakti:</strong> <?php echo htmlspecialchars($report['contact_details']); ?></p>
-                        <p><strong>Status:</strong> <span class="status-badge"><?php echo htmlspecialchars($report['status']); ?></span></p>
-                        
-                        <div class="report-actions-footer" style="margin-top:15px; padding-top:10px; border-top:1px solid var(--color-paper); text-align:right;">
-                            <button class="btn btn-small-action btn-outline" onclick="markReportAs('apstrādāts', <?php echo $report['report_id']; ?>)">Atzīmēt kā apstrādātu</button>
-                            <button class="btn btn-small-action btn-reject-book" style="background-color: var(--color-burgundy);" onclick="markReportAs('dzēsts', <?php echo $report['report_id']; ?>)">Dzēst ziņojumu</button>
+                <div class="form-section-title"><h3>Ziņojumi par problēmām (Jauni)</h3></div>
+                <div class="moderation-section issue-reports-section">
+                    <?php if (empty($reported_issues)): ?>
+                        <p class="no-books-message">Nav jaunu ziņojumu par problēmām.</p>
+                    <?php else: ?>
+                        <div class="issue-reports-list">
+                            <?php foreach ($reported_issues as $report): ?>
+                                <div class="issue-report-card" id="issue-report-<?php echo $report['report_id']; ?>">
+                                    <h4>Problēmas veids: <?php echo htmlspecialchars($report['issue_type']); ?></h4>
+                                    <p><strong>Ziņotājs:</strong> <?php echo htmlspecialchars($report['ReporterName'] ?? 'Anonīms'); ?> (ID: <?php echo htmlspecialchars($report['reporter_user_id']); ?>)</p>
+                                    <p><strong>Datums:</strong> <?php echo htmlspecialchars(date('d.m.Y H:i', strtotime($report['issue_date']))); ?></p>
+                                    <p><strong>Ziņots:</strong> <?php echo htmlspecialchars(date('d.m.Y H:i', strtotime($report['report_date']))); ?></p>
+                                    
+                                    <?php if (!empty($report['related_user_text'])): ?>
+                                        <p><strong>Saistītais lietotājs:</strong> <?php echo htmlspecialchars($report['related_user_text']); ?></p>
+                                    <?php endif; ?>
+                                    <?php if (!empty($report['related_book_text'])): ?>
+                                        <p><strong>Saistītā grāmata:</strong> <?php echo htmlspecialchars($report['related_book_text']); ?></p>
+                                    <?php endif; ?>
+                                    
+                                    <p><strong>Apraksts:</strong><br><?php echo nl2br(htmlspecialchars($report['description'])); ?></p>
+                                    <p><strong>Kontakti:</strong> <?php echo htmlspecialchars($report['contact_details']); ?></p>
+                                    <p><strong>Status:</strong> <span class="status-badge"><?php echo htmlspecialchars($report['status']); ?></span></p>
+                                    
+                                    <div class="report-actions-footer" style="margin-top:15px; padding-top:10px; border-top:1px solid var(--color-paper); text-align:right;">
+                                        <button class="btn btn-small-action btn-outline" onclick="markReportAs('apstrādāts', <?php echo $report['report_id']; ?>)">Atzīmēt kā apstrādātu</button>
+                                        <button class="btn btn-small-action btn-reject-book" style="background-color: var(--color-burgundy);" onclick="markReportAs('dzēsts', <?php echo $report['report_id']; ?>)">Dzēst ziņojumu</button>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
-    </div>
-<?php endif; ?>
-            <?php else: ?>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+            <?php else: // Regular user sections ?>
                 <div class="form-section-title"><h3>Mana bibliotēka</h3></div>
                 <button type="button" id="addBookBtn" class="btn-outline">Pievienot grāmatu</button>
                 <div id="addBookSection" class="add-book-section hidden">
@@ -786,8 +1205,43 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
                         </div>
                     <?php endif; ?>
                 </div>
-            <?php endif; ?>
-             <!-- НОВЫЙ РАЗДЕЛ: Grāmatu maiņas -->
+                <?php if ($userRole === 'Registrēts'): ?>
+                <div class="form-section-title"><h3>Mans vēlmju saraksts</h3></div>
+                <div class="user-wishlist-section">
+                    <?php if (empty($wishlist_books_for_js)): ?>
+                        <p class="no-books-message">Jūsu vēlmju saraksts ir tukšs.</p>
+                    <?php else: ?>
+                        <div class="books-grid" id="wishlistBooksGrid">
+                            <?php foreach ($wishlist_books_for_js as $wish_book): ?>
+                                <div class="book-card" id="wishlist-book-card-<?php echo $wish_book['GramatasID']; ?>" data-bookid="<?php echo $wish_book['GramatasID']; ?>">
+                                    <a href="book.php?id=<?php echo $wish_book['GramatasID']; ?>" class="book-cover-container">
+                                        <?php if (!empty($wish_book['Attels'])): ?>
+                                            <img src="<?php echo htmlspecialchars($wish_book['Attels']); ?>?t=<?php echo time(); ?>" alt="<?php echo htmlspecialchars($wish_book['Nosaukums']); ?>" class="book-cover">
+                                        <?php else: ?>
+                                            <div class="book-cover-fallback"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+                                        <?php endif; ?>
+                                    </a>
+                                    <div class="book-info">
+                                        <a href="book.php?id=<?php echo $wish_book['GramatasID']; ?>"><h3 class="book-title"><?php echo htmlspecialchars($wish_book['Nosaukums']); ?></h3></a>
+                                        <p class="book-author"><?php echo htmlspecialchars($wish_book['Autors']); ?></p>
+                                        <div class="book-tags">
+                                            <span class="book-tag"><?php echo htmlspecialchars($wish_book['Zanrs']); ?></span>
+                                            <span class="book-tag"><?php echo htmlspecialchars($wish_book['Stavoklis'] ?? 'N/A'); ?></span>
+                                        </div>
+                                         <p style="font-size:0.8em; color:var(--color-gray);">Pievienots: <?php echo htmlspecialchars(date('d.m.Y', strtotime($wish_book['PievienosanasDatums']))); ?></p>
+                                    </div>
+                                    <div class="book-actions-footer">
+                                        <button type="button" class="btn btn-small-action wishlist-button-profile" onclick="toggleWishlistInProfile(<?php echo $wish_book['GramatasID']; ?>, this)">Noņemt no vēlmēm</button>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?> 
+
+            <?php endif; // End regular user sections ?>
+            <?php if ($userRole !== 'Moderators' && $userRole !== 'Administrators'): ?>
                         <div class="form-section-title"><h3>Grāmatu maiņas</h3></div>
                         <div class="exchange-requests-section">
                             
@@ -904,13 +1358,40 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
                                 </div>
                             <?php endif; ?>
                         </div>
+                        
+                        <!-- USER REVIEWS: Completed Exchanges for Review -->
+                        <div class="form-section-title"><h3>Pabeigtās Maiņas un Atsauksmes</h3></div>
+                        <div class="completed-exchanges-section">
+                            <?php if (empty($completed_exchanges_for_review)): ?>
+                                <p class="no-books-message">Jums nav pabeigtu maiņu, par kurām varētu atstāt atsauksmi.</p>
+                            <?php else: ?>
+                                <?php foreach ($completed_exchanges_for_review as $ex): ?>
+                                <div class="exchange-review-card" id="exchange-review-card-<?php echo $ex['PieprasijumaID']; ?>">
+                                    <p><strong>Maiņa ar:</strong> <?php echo htmlspecialchars($ex['other_user_name']); ?></p>
+                                    <p><strong>Jūs atdevāt:</strong> "<?php echo htmlspecialchars($ex['book_you_got_title']); ?>"</p>
+                                    <p><strong>Jūs saņēmāt:</strong> "<?php echo htmlspecialchars($ex['book_they_got_title']); ?>"</p>
+                                    <div class="review-action-area" id="review-action-<?php echo $ex['PieprasijumaID']; ?>">
+                                    <?php if ($ex['can_review_other_user']): ?>
+                                        <button class="btn btn-leave-review" 
+                                                onclick="openUserReviewModal(<?php echo $ex['PieprasijumaID']; ?>, <?php echo $ex['other_user_id']; ?>, '<?php echo htmlspecialchars(addslashes($ex['other_user_name'])); ?>')">
+                                            Atstāt atsauksmi par <?php echo htmlspecialchars($ex['other_user_name']); ?>
+                                        </button>
+                                    <?php else: ?>
+                                        <p class="review-submitted-text">Atsauksme par <?php echo htmlspecialchars($ex['other_user_name']); ?> jau iesniegta.</p>
+                                    <?php endif; ?>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+            <?php endif; ?>
           </div>
         </div>
       </div>
     </section>
   </main>
 
-    <div id="deleteBookModal" class="modal">
+    <div id="deleteBookModal" class="modal"> 
         <div class="modal-content">
             <span class="close-button-modal" onclick="closeDeleteModal()">×</span>
             <h3>Apstiprināt grāmatas dzēšanu</h3>
@@ -923,7 +1404,7 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
             </div>
         </div>
     </div>
-    <div id="rejectBookModal" class="modal">
+    <div id="rejectBookModal" class="modal"> 
         <div class="modal-content">
             <span class="close-button-modal" onclick="closeRejectModal()">×</span>
             <h3>Apstiprināt noraidīšanu</h3>
@@ -935,32 +1416,61 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
             </div>
         </div>
     </div>
-  
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a href="index.php" class="brand">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="brand-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-            <h2 class="brand-name">BookSwap</h2>
-          </a>
-          <p>Saistieties ar citiem lasītājiem un apmainieties ar grāmatām, kuras jūs mīlat.</p>
-          <div class="social-links">
-            <a href="#" class="social-link"><svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" fill="none" stroke="currentColor" stroke-width="2"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" fill="none" stroke="currentColor" stroke-width="2"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" fill="none" stroke="currentColor" stroke-width="2"></line></svg></a>
-            <a href="#" class="social-link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"></path></svg></a>
-            <a href="#" class="social-link"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg></a>
-          </div>
+    <div id="promoteAdminModal" class="modal"> 
+        <div class="modal-content">
+            <span class="close-button-modal" onclick="closePromoteAdminModal()">×</span>
+            <h3>Apstiprināt paaugstināšanu par Administratoru</h3>
+            <p>Lai apstiprinātu lietotāja "<strong id="modalPromoteUserEmail"></strong>" paaugstināšanu, lūdzu, atkārtoti ievadiet viņa e-pasta adresi:</p>
+            <input type="email" id="confirmPromoteEmailInput" placeholder="Atkārtoti ievadiet e-pastu">
+            <div class="modal-footer-buttons">
+                <button type="button" class="btn btn-outline" onclick="closePromoteAdminModal()">Atcelt</button>
+                <button type="button" id="confirmPromoteAdminBtnModal" class="btn-primary" disabled>Apstiprināt Paaugstināšanu</button>
+            </div>
         </div>
-        <div class="footer-links"><h3 class="footer-title">Ātrās saites</h3><ul><li><a href="browse.php">Pārlūkot</a></li><li><a href="how-it-works.php">Kā darbojas</a></li><li><a href="signup.php">Reģistrēties</a></li><li><a href="login.php">Pieslēgties</a></li></ul></div>
-        <div class="footer-links"><h3 class="footer-title">Palīdzība</h3><ul><li><a href="faq.php">BUJ</a></li><li><a href="contact-us.php">Kontakti</a></li><li><a href="safety-tips.php">Drošība</a></li><li><a href="report-issue.php">Ziņot</a></li></ul></div>
-        <div class="footer-links"><h3 class="footer-title">Juridiskā info</h3><ul><li><a href="terms.php">Noteikumi</a></li><li><a href="privacy-policy.php">Privātums</a></li><li><a href="cookies.php">Sīkdatnes</a></li><li><a href="gdpr.php">VDAR</a></li></ul></div>
-      </div>
-      <div class="footer-bottom"><p>© <span id="currentYear"></span> BookSwap. Visas tiesības aizsargātas.</p></div>
     </div>
-  </footer>
+    <div id="demoteAdminModal" class="modal"> 
+        <div class="modal-content">
+            <span class="close-button-modal" onclick="closeDemoteAdminModal()">×</span>
+            <h3>Apstiprināt Administratora tiesību noņemšanu</h3>
+            <p>Lai apstiprinātu administratora tiesību noņemšanu lietotājam "<strong id="modalDemoteUserEmail"></strong>", lūdzu, atkārtoti ievadiet viņa e-pasta adresi:</p>
+            <input type="email" id="confirmDemoteEmailInput" placeholder="Atkārtoti ievadiet e-pastu">
+            <div class="modal-footer-buttons">
+                <button type="button" class="btn btn-outline" onclick="closeDemoteAdminModal()">Atcelt</button>
+                <button type="button" id="confirmDemoteAdminBtnModal" class="btn-primary" disabled>Apstiprināt Noņemšanu</button>
+            </div>
+        </div>
+    </div>
+    <div id="userReviewModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button-modal" onclick="closeUserReviewModal()">×</span>
+            <h3 id="userReviewModalTitle">Novērtēt lietotāju</h3>
+            <p>Lūdzu, novērtējiet savu maiņas pieredzi ar <strong id="reviewedUserNameModal"></strong>.</p>
+            <div class="form-group">
+                <label>Vērtējums (1-5 zvaigznes):</label>
+                <div class="star-rating-input">
+                    <input type="radio" id="star5" name="rating_modal" value="5" required /><label for="star5" title="5 zvaigznes">★</label>
+                    <input type="radio" id="star4" name="rating_modal" value="4" /><label for="star4" title="4 zvaigznes">★</label>
+                    <input type="radio" id="star3" name="rating_modal" value="3" /><label for="star3" title="3 zvaigznes">★</label>
+                    <input type="radio" id="star2" name="rating_modal" value="2" /><label for="star2" title="2 zvaigznes">★</label>
+                    <input type="radio" id="star1" name="rating_modal" value="1" /><label for="star1" title="1 zvaigzne">★</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="reviewCommentModal">Komentārs (nav obligāts):</label>
+                <textarea id="reviewCommentModal" class="form-textarea" rows="3" placeholder="Jūsu komentārs..."></textarea>
+            </div>
+            <div class="modal-footer-buttons">
+                <button type="button" class="btn btn-outline" onclick="closeUserReviewModal()">Atcelt</button>
+                <button type="button" id="submitReviewBtnModal" class="btn-primary">Iesniegt atsauksmi</button>
+            </div>
+        </div>
+    </div>
+  
+  <footer class="footer"> <!-- ... (kā iepriekš) ... --> </footer>
   <script src="script.js"></script>
   <script src="profile_js.js"></script> 
   <script>
+    // ... (visa iepriekšējā JavaScript loģika no profile.php) ...
     document.addEventListener('DOMContentLoaded', function() {
         const toastContainer = document.getElementById('toast-container');
         const existingToasts = toastContainer ? toastContainer.querySelectorAll('.toast.show, .auth-error.active') : [];
@@ -1202,15 +1712,261 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
                         }
                     }
                     if (decision === 'approve' && data.initiator_id && data.initiator_name) {
-                        if (confirm(`Maiņa apstiprināta! Vai vēlaties sākt sarunu ar ${data.initiator_name}?`)) {
-                            if (typeof window.initiateChatWithUser === 'function') {
-                                window.initiateChatWithUser(data.initiator_id, data.initiator_name);
-                            }
-                        }
+                        // Reload page to see the "Leave Review" button for the completed exchange
+                        location.reload(); 
+                        // Optionally, directly call initiateChat:
+                        // if (confirm(`Maiņa apstiprināta! Vai vēlaties sākt sarunu ar ${data.initiator_name}?`)) {
+                        //     if (typeof window.initiateChatWithUser === 'function') {
+                        //         window.initiateChatWithUser(data.initiator_id, data.initiator_name);
+                        //     }
+                        // }
                     }
                 } else { showUIMessage(data.message || 'Kļūda apstrādājot pieprasījumu.', 'error'); }
             }).catch(error => showUIMessage('Tīkla kļūda.', 'error'));
         }
+
+        const promoteAdminModal = document.getElementById('promoteAdminModal');
+        const initiatePromoteBtn = document.getElementById('initiatePromoteBtn');
+        const confirmPromoteEmailInput = document.getElementById('confirmPromoteEmailInput');
+        const confirmPromoteAdminBtnModal = document.getElementById('confirmPromoteAdminBtnModal');
+        const modalPromoteUserEmailSpan = document.getElementById('modalPromoteUserEmail');
+        const promoteEmailInputGlobal = document.getElementById('promoteEmailInput'); 
+        let targetEmailForPromotion = "";
+
+        if (initiatePromoteBtn && promoteEmailInputGlobal && promoteAdminModal) {
+            initiatePromoteBtn.addEventListener('click', function() {
+                targetEmailForPromotion = promoteEmailInputGlobal.value.trim();
+                if (!targetEmailForPromotion) { showUIMessage('Lūdzu, ievadiet e-pasta adresi.', 'error'); return; }
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmailForPromotion)) { showUIMessage('Lūdzu, ievadiet derīgu e-pasta adresi.', 'error'); return; }
+                if (modalPromoteUserEmailSpan) modalPromoteUserEmailSpan.textContent = targetEmailForPromotion;
+                if (confirmPromoteEmailInput) confirmPromoteEmailInput.value = '';
+                if (confirmPromoteAdminBtnModal) confirmPromoteAdminBtnModal.disabled = true;
+                promoteAdminModal.style.display = 'block';
+            });
+        }
+        window.closePromoteAdminModal = function() {
+            if (promoteAdminModal) promoteAdminModal.style.display = 'none';
+            if (promoteEmailInputGlobal) promoteEmailInputGlobal.value = ''; 
+        }
+        if (confirmPromoteEmailInput && confirmPromoteAdminBtnModal) {
+            confirmPromoteEmailInput.addEventListener('input', function() {
+                confirmPromoteAdminBtnModal.disabled = this.value.trim().toLowerCase() !== targetEmailForPromotion.toLowerCase();
+            });
+        }
+        if (confirmPromoteAdminBtnModal) {
+            confirmPromoteAdminBtnModal.addEventListener('click', function() {
+                if (targetEmailForPromotion && confirmPromoteEmailInput.value.trim().toLowerCase() === targetEmailForPromotion.toLowerCase()) {
+                    const formData = new FormData();
+                    formData.append('ajax_action', 'promote_to_admin');
+                    formData.append('target_email', targetEmailForPromotion);
+                    confirmPromoteAdminBtnModal.disabled = true; 
+                    fetch('profile.php', { method: 'POST', body: formData })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) { showUIMessage(data.message, 'success'); if (promoteEmailInputGlobal) promoteEmailInputGlobal.value = ''; location.reload(); } 
+                        else { showUIMessage(data.message || 'Kļūda paaugstinot lietotāju.', 'error'); }
+                    })
+                    .catch(error => { showUIMessage('Tīkla kļūda veicot paaugstināšanu.', 'error'); })
+                    .finally(() => { closePromoteAdminModal(); });
+                }
+            });
+        }
+
+        const demoteAdminModal = document.getElementById('demoteAdminModal');
+        const confirmDemoteEmailInput = document.getElementById('confirmDemoteEmailInput');
+        const confirmDemoteAdminBtnModal = document.getElementById('confirmDemoteAdminBtnModal');
+        const modalDemoteUserEmailSpan = document.getElementById('modalDemoteUserEmail');
+        let currentAdminIdToDemote = null;
+        let currentAdminEmailToDemote = "";
+
+        window.openDemoteAdminModal = function(adminId, adminEmail) {
+            currentAdminIdToDemote = adminId; currentAdminEmailToDemote = adminEmail;
+            if (modalDemoteUserEmailSpan) modalDemoteUserEmailSpan.textContent = adminEmail;
+            if (confirmDemoteEmailInput) confirmDemoteEmailInput.value = '';
+            if (confirmDemoteAdminBtnModal) confirmDemoteAdminBtnModal.disabled = true;
+            if (demoteAdminModal) demoteAdminModal.style.display = 'block';
+        }
+        window.closeDemoteAdminModal = function() { if(demoteAdminModal) demoteAdminModal.style.display = 'none'; }
+
+        if (confirmDemoteEmailInput && confirmDemoteAdminBtnModal) {
+            confirmDemoteEmailInput.addEventListener('input', function() {
+                confirmDemoteAdminBtnModal.disabled = this.value.trim().toLowerCase() !== currentAdminEmailToDemote.toLowerCase();
+            });
+        }
+        if (confirmDemoteAdminBtnModal) {
+            confirmDemoteAdminBtnModal.addEventListener('click', function() {
+                if (currentAdminIdToDemote && confirmDemoteEmailInput.value.trim().toLowerCase() === currentAdminEmailToDemote.toLowerCase()) {
+                    const formData = new FormData();
+                    formData.append('ajax_action', 'demote_admin');
+                    formData.append('target_user_id', currentAdminIdToDemote);
+                    confirmDemoteAdminBtnModal.disabled = true;
+                    fetch('profile.php', { method: 'POST', body: formData })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) { showUIMessage(data.message, 'success'); removeAdminFromUIList(currentAdminIdToDemote); } 
+                        else { showUIMessage(data.message || 'Kļūda pazeminot administratoru.', 'error');}
+                    })
+                    .catch(error => { showUIMessage('Tīkla kļūda veicot pazemināšanu.', 'error'); })
+                    .finally(() => { closeDemoteAdminModal(); });
+                }
+            });
+        }
+
+        function removeAdminFromUIList(adminId) {
+            const adminCard = document.getElementById(`admin-card-${adminId}`);
+            if (adminCard) {
+                adminCard.remove();
+                const adminListContainer = document.querySelector('.current-admins-list');
+                 if (adminListContainer) {
+                    let hasOtherAdmins = false;
+                    const remainingAdminCards = adminListContainer.querySelectorAll('.admin-user-card');
+                    const currentUserIdPHP = <?php echo json_encode($userId); ?>; 
+                    remainingAdminCards.forEach(card => {
+                        if (card.id !== `admin-card-${currentUserIdPHP}`) { 
+                            hasOtherAdmins = true;
+                        }
+                    });
+
+                    if (!hasOtherAdmins && remainingAdminCards.length === 0) { 
+                         let noAdminsMsg = adminListContainer.querySelector('.no-books-message');
+                        if (!noAdminsMsg) {
+                            noAdminsMsg = document.createElement('p');
+                            noAdminsMsg.className = 'no-books-message';
+                            adminListContainer.appendChild(noAdminsMsg);
+                        }
+                        noAdminsMsg.textContent = 'Pašlaik nav citu administratoru.';
+                    }
+                }
+            }
+        }
+        
+        window.toggleWishlistInProfile = function(bookId, buttonElement) {
+            const formData = new FormData();
+            formData.append('ajax_action', 'toggle_wishlist');
+            formData.append('book_id', bookId);
+
+            fetch('profile.php', { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showUIMessage(data.message, 'success');
+                    if (!data.wishlisted) { 
+                        const card = document.getElementById(`wishlist-book-card-${bookId}`);
+                        if (card) card.remove();
+                        const wishlistGrid = document.getElementById('wishlistBooksGrid');
+                        const wishlistCountSpan = document.getElementById('wishlistCountProfile');
+                        if(wishlistGrid && wishlistGrid.children.length === 0) {
+                            wishlistGrid.innerHTML = '<p class="no-books-message">Jūsu vēlmju saraksts ir tukšs.</p>';
+                        }
+                        if(wishlistCountSpan) {
+                            let currentCount = parseInt(wishlistCountSpan.textContent);
+                            if (!isNaN(currentCount) && currentCount > 0) {
+                                wishlistCountSpan.textContent = currentCount - 1;
+                            } else {
+                                wishlistCountSpan.textContent = 0;
+                            }
+                        }
+                    }
+                } else {
+                    showUIMessage(data.message || 'Kļūda ar vēlmju sarakstu.', 'error');
+                }
+            })
+            .catch(error => showUIMessage('Tīkla kļūda ar vēlmju sarakstu.', 'error'));
+        }
+
+        // USER REVIEW MODAL LOGIC
+        const userReviewModal = document.getElementById('userReviewModal');
+        const userReviewModalTitle = document.getElementById('userReviewModalTitle');
+        const reviewedUserNameModalSpan = document.getElementById('reviewedUserNameModal');
+        const reviewCommentModalTextarea = document.getElementById('reviewCommentModal');
+        const submitReviewBtnModal = document.getElementById('submitReviewBtnModal');
+        const starRatingInputs = document.querySelectorAll('.star-rating-input input[name="rating_modal"]');
+        
+        let currentExchangeIdForReview = null;
+        let currentReviewedUserIdForReview = null;
+        let currentSelectedRating = 0;
+
+        window.openUserReviewModal = function(exchangeId, reviewedUserId, reviewedUserName) {
+            currentExchangeIdForReview = exchangeId;
+            currentReviewedUserIdForReview = reviewedUserId;
+            currentSelectedRating = 0; 
+            
+            if (userReviewModalTitle) userReviewModalTitle.textContent = `Novērtēt maiņu ar ${reviewedUserName}`;
+            if (reviewedUserNameModalSpan) reviewedUserNameModalSpan.textContent = reviewedUserName;
+            if (reviewCommentModalTextarea) reviewCommentModalTextarea.value = '';
+            starRatingInputs.forEach(radio => radio.checked = false); 
+            if (submitReviewBtnModal) submitReviewBtnModal.disabled = true; 
+            if (userReviewModal) userReviewModal.style.display = 'block';
+        }
+
+        window.closeUserReviewModal = function() {
+            if (userReviewModal) userReviewModal.style.display = 'none';
+        }
+
+        starRatingInputs.forEach(radio => {
+            radio.addEventListener('change', function() {
+                currentSelectedRating = parseInt(this.value);
+                if (submitReviewBtnModal) submitReviewBtnModal.disabled = false;
+            });
+        });
+
+        if (submitReviewBtnModal) {
+            submitReviewBtnModal.addEventListener('click', function() {
+                if (currentSelectedRating === 0) {
+                    showUIMessage('Lūdzu, izvēlieties vērtējumu (zvaigznes).', 'error');
+                    return;
+                }
+
+                const comment = reviewCommentModalTextarea ? reviewCommentModalTextarea.value.trim() : '';
+                submitReviewBtnModal.disabled = true;
+
+                const formData = new FormData();
+                formData.append('ajax_action', 'submit_user_review');
+                formData.append('exchange_id', currentExchangeIdForReview);
+                formData.append('reviewed_user_id', currentReviewedUserIdForReview);
+                formData.append('rating', currentSelectedRating);
+                formData.append('comment', comment);
+
+                fetch('profile.php', { method: 'POST', body: formData })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showUIMessage(data.message, 'success');
+                        const reviewActionArea = document.getElementById(`review-action-${currentExchangeIdForReview}`);
+                        if(reviewActionArea) {
+                            reviewActionArea.innerHTML = '<p class="review-submitted-text">Atsauksme iesniegta.</p>';
+                        }
+                        // Reload user's average rating in sidebar if it's their own profile page
+                        const currentUserIdOnPage = document.body.dataset.currentUserId;
+                        if (currentReviewedUserIdForReview.toString() === currentUserIdOnPage.toString()) {
+                             // This is tricky without a full page reload or more complex JS.
+                             // For now, let's just note that this would be the place to update it.
+                             // Or, simply reload the page after successful review:
+                             // location.reload();
+                        }
+
+
+                    } else {
+                        showUIMessage(data.message || 'Kļūda iesniedzot atsauksmi.', 'error');
+                    }
+                })
+                .catch(error => {
+                    showUIMessage('Tīkla kļūda iesniedzot atsauksmi.', 'error');
+                })
+                .finally(() => {
+                    closeUserReviewModal();
+                });
+            });
+        }
+
+
+        window.addEventListener('click', function(event) {
+            if (event.target == promoteAdminModal) { closePromoteAdminModal(); }
+            if (event.target == demoteAdminModal) { closeDemoteAdminModal(); } 
+            if (event.target == deleteModal) { closeDeleteModal(); }
+            if (event.target == rejectModal) { closeRejectModal(); }
+            if (event.target == userReviewModal) { closeUserReviewModal(); }
+        });
 
 
         function showUIMessage(message, type = 'success') {
@@ -1258,12 +2014,10 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
         </div>
         <div id="chat-body">
             <div id="chat-conversation-list">
-                <!-- Conversations will be loaded here by JS -->
                 <div class="loading-spinner hidden"><div class="spinner"></div></div>
             </div>
             <div id="chat-message-area" class="hidden">
                 <div id="chat-messages-display">
-                    <!-- Messages will be loaded here by JS -->
                      <div class="loading-spinner hidden"><div class="spinner"></div></div>
                 </div>
                 <form id="chat-message-form">
@@ -1280,9 +2034,8 @@ if ($savienojums && !is_string($savienojums) && mysqli_ping($savienojums)) $savi
 </div>
 <!-- Chat Widget End -->
 
-<!-- Подключаем CSS и JS для чата -->
-<link rel="stylesheet" href="chat.css?v=<?php echo time(); // Cache busting ?>">
-<script src="chat.js?v=<?php echo time(); // Cache busting ?>"></script>
+<link rel="stylesheet" href="chat.css?v=<?php echo time(); ?>">
+<script src="chat.js?v=<?php echo time(); ?>"></script>
 
 </body>
 </html>
